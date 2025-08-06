@@ -1,6 +1,14 @@
 import os
 
 def processar_arquivo(input_path, output_path, update_progress):
+    """
+    Processa arquivos XML ou TXT e salva o resultado formatado
+    
+    Args:
+        input_path (str): Caminho do arquivo de entrada
+        output_path (str): Caminho do arquivo de saída
+        update_progress (function): Função para atualizar a interface
+    """
     try:
         ext = os.path.splitext(input_path)[1].lower()
         

@@ -1,5 +1,7 @@
 # Processador de Arquivos Bancários XML/TXT
 
+![Captura de Tela](docs/images/screenshot.png)
+
 Este programa processa arquivos XML ou TXT contendo dados bancários, transformando cada bloco `<Cli>` em uma única linha.
 
 ## Funcionalidades

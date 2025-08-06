@@ -1,17 +1,26 @@
-# Ignorar arquivos gerados
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
-# Ignorar arquivos de ambiente
+# Environments
 venv/
 env/
-.vscode/
+.venv/
 
-# Ignorar arquivos de sistema
+# Build artifacts
+build/
+dist/
+*.spec
+
+# System files
 .DS_Store
 Thumbs.db
 
-# Ignorar arquivos de saída
+# Editor
+.vscode/
+.idea/
+
+# Output files
 *_ALTERADO.*

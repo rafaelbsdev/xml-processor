@@ -18,6 +18,7 @@ class Application(tk.Tk):
         self.caminho_saida = ""
     
     def criar_widgets(self):
+        """Cria todos os componentes da interface gráfica"""
         # Frame principal
         main_frame = ttk.Frame(self, padding=20)
         main_frame.pack(fill=tk.BOTH, expand=True)
@@ -124,12 +125,14 @@ class Application(tk.Tk):
         ).pack(side=tk.RIGHT)
     
     def log(self, mensagem):
+        """Adiciona uma mensagem à área de log"""
         self.log_area.config(state=tk.NORMAL)
         self.log_area.insert(tk.END, mensagem + "\n")
         self.log_area.see(tk.END)
         self.log_area.config(state=tk.DISABLED)
     
     def selecionar_entrada(self):
+        """Abre diálogo para selecionar arquivo de entrada"""
         caminho = filedialog.askopenfilename(
             title="Selecione o arquivo XML ou TXT",
             filetypes=[
@@ -145,10 +148,12 @@ class Application(tk.Tk):
             self.log(f"Arquivo selecionado: {os.path.basename(caminho)}")
     
     def iniciar_processamento(self):
+        """Inicia o processamento do arquivo"""
         if not self.caminho_entrada:
             messagebox.showerror("Erro", "Selecione um arquivo primeiro!")
             return
             
+        # Gerar caminho de saída automaticamente
         diretorio = os.path.dirname(self.caminho_entrada)
         nome_arquivo = os.path.basename(self.caminho_entrada)
         nome, ext = os.path.splitext(nome_arquivo)
@@ -161,12 +166,14 @@ class Application(tk.Tk):
         self.log(f"Iniciando processamento...")
         self.log(f"Arquivo de saída: {novo_nome}")
         
+        # Executar em thread separada para não travar a interface
         threading.Thread(
             target=self.executar_processamento, 
             daemon=True
         ).start()
     
     def executar_processamento(self):
+        """Executa o processamento do arquivo em segundo plano"""
         try:
             sucesso, mensagem = processar_arquivo(
                 self.caminho_entrada,
@@ -193,13 +200,14 @@ class Application(tk.Tk):
             self.btn_processar.config(state=tk.NORMAL)
     
     def atualizar_progresso(self, valor):
+        """Atualiza a barra de progresso"""
         self.progress["value"] = valor
         self.lbl_status.config(text=f"Processando... {valor}%")
         self.update_idletasks()
     
     def abrir_pasta_saida(self):
+        """Abre o explorador de arquivos na pasta de saída"""
         import subprocess
-        import os
         
         if os.path.exists(self.caminho_saida):
             pasta = os.path.dirname(self.caminho_saida)

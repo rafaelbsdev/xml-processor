@@ -1,1 +1,2 @@
 tk
+pyinstaller==5.13.0  # Apenas necessário para gerar o executável
