@@ -1,143 +1,239 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Elementos DOM
-    const fileInput = document.getElementById('fileInput');
-    const dropZone = document.getElementById('dropZone');
-    const selectFileBtn = document.getElementById('selectFileBtn');
-    const processBtn = document.getElementById('processBtn');
-    const downloadSampleBtn = document.getElementById('downloadSampleBtn');
-    const progressBar = document.getElementById('progressBar');
-    const progressText = document.getElementById('progressText');
-    const logContent = document.getElementById('logContent');
-    const clearLogBtn = document.getElementById('clearLogBtn');
-    const uploadIcon = dropZone.querySelector('.upload-icon i');
+    // Constantes de configuração
+    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+    const ALLOWED_FILE_TYPES = ['xml', 'txt'];
     
-    let selectedFile = null;
-    
-    // Event Listeners
-    selectFileBtn.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', handleFileSelect);
-    processBtn.addEventListener('click', processFile);
-    downloadSampleBtn.addEventListener('click', downloadSample);
-    clearLogBtn.addEventListener('click', clearLog);
-    
-    // Drag and drop
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, preventDefaults, false);
-    });
-    
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropZone.addEventListener(eventName, highlight, false);
-    });
-    
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, unhighlight, false);
-    });
-    
-    dropZone.addEventListener('drop', handleDrop, false);
-    
-    // Funções
+    // Elementos da UI
+    const UI = {
+        fileInput: document.getElementById('fileInput'),
+        dropZone: document.getElementById('dropZone'),
+        selectFileBtn: document.getElementById('selectFileBtn'),
+        processBtn: document.getElementById('processBtn'),
+        downloadSampleBtn: document.getElementById('downloadSampleBtn'),
+        clearFileBtn: document.getElementById('clearFileBtn'),
+        progressBar: document.getElementById('progressBar'),
+        progressText: document.getElementById('progressText'),
+        logContent: document.getElementById('logContent'),
+        uploadIcon: document.querySelector('.upload-icon i'),
+        fileName: document.getElementById('fileName'),
+        fileSize: document.getElementById('fileSize'),
+        fileInfo: document.getElementById('fileInfo'),
+        uploadMessage: document.querySelector('.upload-message'),
+        mainMessage: document.querySelector('.main-message'),
+        secondaryMessage: document.querySelector('.secondary-message')
+    };
+
+    // Estado da aplicação
+    const AppState = {
+        selectedFile: null,
+        isProcessing: false
+    };
+
+    // Inicialização
+    function init() {
+        setupEventListeners();
+        addLog('Aplicação inicializada. Selecione um arquivo para começar.');
+    }
+
+    // Configuração de event listeners
+    function setupEventListeners() {
+        // Upload por clique
+        UI.selectFileBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            UI.fileInput.click();
+        });
+
+        // Upload por clique na área
+        UI.dropZone.addEventListener('click', () => UI.fileInput.click());
+
+        // Seleção de arquivo
+        UI.fileInput.addEventListener('change', handleFileSelection);
+
+        // Processamento
+        UI.processBtn.addEventListener('click', processFile);
+
+        // Limpar seleção
+        UI.clearFileBtn.addEventListener('click', clearFileSelection);
+
+        // Download de exemplo
+        UI.downloadSampleBtn.addEventListener('click', downloadSampleFile);
+
+        // Drag and drop
+        const dragEvents = ['dragenter', 'dragover', 'dragleave', 'drop'];
+        dragEvents.forEach(eventName => {
+            UI.dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            UI.dropZone.addEventListener(eventName, highlightDropZone, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            UI.dropZone.addEventListener(eventName, unhighlightDropZone, false);
+        });
+
+        UI.dropZone.addEventListener('drop', handleFileDrop, false);
+    }
+
+    // Funções utilitárias
     function preventDefaults(e) {
         e.preventDefault();
         e.stopPropagation();
     }
-    
-    function highlight() {
-        dropZone.classList.add('active');
-        uploadIcon.className = 'fas fa-file-upload';
-        uploadIcon.style.color = '#27ae60';
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const units = ['Bytes', 'KB', 'MB', 'GB'];
+        const unitIndex = Math.floor(Math.log(bytes) / Math.log(1024));
+        return `${(bytes / Math.pow(1024, unitIndex)).toFixed(2)} ${units[unitIndex]}`;
     }
-    
-    function unhighlight() {
-        dropZone.classList.remove('active');
-        uploadIcon.className = 'fas fa-cloud-upload-alt';
-        uploadIcon.style.color = '#3498db';
+
+    function getFileExtension(filename) {
+        return filename.split('.').pop().toLowerCase();
     }
-    
-    function handleDrop(e) {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        handleFiles(files);
+
+    // Manipulação de arquivos
+    function handleFileSelection(e) {
+        const files = e.target.files;
+        if (files.length > 0) {
+            validateAndLoadFile(files[0]);
+        }
     }
-    
-    function handleFileSelect(e) {
-        handleFiles(e.target.files);
-        // Resetar o input para permitir selecionar o mesmo arquivo novamente
-        e.target.value = '';
+
+    function handleFileDrop(e) {
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            validateAndLoadFile(files[0]);
+        }
     }
-    
-    function handleFiles(files) {
-        if (files.length === 0) return;
-        
-        const file = files[0];
-        const fileName = file.name;
-        const fileExtension = fileName.split('.').pop().toLowerCase();
-        
-        if (fileExtension !== 'xml' && fileExtension !== 'txt') {
-            addLog('Erro: Apenas arquivos XML ou TXT são suportados', 'error');
+
+    function validateAndLoadFile(file) {
+        // Validação do tipo de arquivo
+        const fileExtension = getFileExtension(file.name);
+        if (!ALLOWED_FILE_TYPES.includes(fileExtension)) {
+            showError(`Tipo de arquivo não suportado. Use: ${ALLOWED_FILE_TYPES.join(', ')}`);
             return;
         }
-        
-        selectedFile = file;
-        
-        // Atualizar a interface
-        uploadIcon.className = 'fas fa-file-alt';
-        uploadIcon.style.color = '#f39c12';
-        dropZone.querySelector('p').textContent = fileName;
-        
-        addLog(`Arquivo selecionado: ${fileName}`);
-        addLog(`Tamanho: ${formatFileSize(file.size)}`);
-        processBtn.disabled = false;
+
+        // Validação do tamanho do arquivo
+        if (file.size > MAX_FILE_SIZE) {
+            showError(`Arquivo muito grande. Tamanho máximo: ${formatFileSize(MAX_FILE_SIZE)}`);
+            return;
+        }
+
+        // Carregar arquivo válido
+        AppState.selectedFile = file;
+        updateFileDisplay(file);
+        addLog(`Arquivo selecionado: ${file.name}`, 'success');
+        addLog(`Tamanho: ${formatFileSize(file.size)}`, 'info');
+        UI.processBtn.disabled = false;
     }
-    
-    function processFile() {
-        if (!selectedFile) return;
+
+    function clearFileSelection() {
+        UI.fileInput.value = '';
+        AppState.selectedFile = null;
+        resetFileDisplay();
+        addLog('Seleção de arquivo removida.', 'info');
+        UI.processBtn.disabled = true;
+    }
+
+    // Atualização da UI
+    function highlightDropZone() {
+        UI.dropZone.classList.add('active');
+        UI.mainMessage.textContent = 'Solte o arquivo para carregar';
+        UI.secondaryMessage.style.visibility = 'hidden';
+        UI.uploadIcon.className = 'fas fa-file-upload';
+        UI.uploadIcon.style.color = 'var(--accent)';
+    }
+
+    function unhighlightDropZone() {
+        UI.dropZone.classList.remove('active');
+        UI.mainMessage.textContent = 'Arraste e solte seu arquivo XML/TXT aqui';
+        UI.secondaryMessage.style.visibility = 'visible';
         
-        addLog('Iniciando processamento...');
+        if (!AppState.selectedFile) {
+            UI.uploadIcon.className = 'fas fa-cloud-upload-alt';
+            UI.uploadIcon.style.color = 'var(--secondary)';
+        }
+    }
+
+    function updateFileDisplay(file) {
+        // Atualizar ícone
+        UI.uploadIcon.className = 'fas fa-file-alt';
+        UI.uploadIcon.style.color = 'var(--warning)';
+        
+        // Atualizar informações do arquivo
+        UI.fileName.textContent = file.name;
+        UI.fileSize.textContent = formatFileSize(file.size);
+        UI.fileInfo.classList.add('show');
+        
+        // Ocultar mensagem padrão
+        UI.uploadMessage.style.display = 'none';
+    }
+
+    function resetFileDisplay() {
+        UI.uploadIcon.className = 'fas fa-cloud-upload-alt';
+        UI.uploadIcon.style.color = 'var(--secondary)';
+        UI.fileInfo.classList.remove('show');
+        UI.uploadMessage.style.display = 'block';
+    }
+
+    function showError(message) {
+        // Feedback visual
+        UI.uploadIcon.className = 'fas fa-exclamation-circle';
+        UI.uploadIcon.style.color = 'var(--error)';
+        UI.dropZone.classList.add('error-state');
+        
+        // Log do erro
+        addLog(`Erro: ${message}`, 'error');
+        
+        // Reset após timeout
+        setTimeout(() => {
+            UI.dropZone.classList.remove('error-state');
+            if (!AppState.selectedFile) {
+                resetFileDisplay();
+            }
+        }, 2000);
+    }
+
+    function updateProgress(percent) {
+        UI.progressBar.style.width = `${percent}%`;
+        UI.progressText.textContent = `${percent}%`;
+    }
+
+    function addLog(message, type = 'info') {
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-entry log-${type}`;
+        
+        const timestamp = new Date().toLocaleTimeString();
+        logEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
+        
+        UI.logContent.appendChild(logEntry);
+        UI.logContent.scrollTop = UI.logContent.scrollHeight;
+    }
+
+    function clearLog() {
+        UI.logContent.innerHTML = '<div class="log-entry">Log limpo</div>';
+    }
+
+    // Processamento do arquivo
+    function processFile() {
+        if (!AppState.selectedFile || AppState.isProcessing) return;
+        
+        AppState.isProcessing = true;
+        UI.processBtn.disabled = true;
+        UI.dropZone.classList.add('processing');
+        addLog('Iniciando processamento...', 'info');
         updateProgress(0);
-        processBtn.disabled = true;
         
         const reader = new FileReader();
         
-        reader.onloadstart = function() {
-            addLog('Lendo arquivo...');
+        reader.onloadstart = () => {
+            addLog('Lendo conteúdo do arquivo...', 'info');
         };
         
-        reader.onload = function(e) {
-            try {
-                addLog('Processando conteúdo...');
-                const content = e.target.result;
-                const processedContent = processXmlTxt(content);
-                
-                // Criar link de download
-                const blob = new Blob([processedContent], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                
-                const a = document.createElement('a');
-                a.href = url;
-                
-                // Gerar nome do arquivo de saída
-                const fileName = selectedFile.name;
-                const newFileName = fileName.replace(/(\.\w+)$/, '_ALTERADO$1');
-                a.download = newFileName;
-                
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                
-                addLog('Processamento concluído com sucesso!', 'success');
-                addLog(`Arquivo "${newFileName}" gerado para download`);
-                updateProgress(100);
-                
-            } catch (error) {
-                addLog(`Erro durante o processamento: ${error.message}`, 'error');
-                updateProgress(0);
-            } finally {
-                processBtn.disabled = false;
-            }
-        };
-        
-        reader.onprogress = function(e) {
+        reader.onprogress = (e) => {
             if (e.lengthComputable) {
                 const percent = Math.round((e.loaded / e.total) * 100);
                 updateProgress(percent);
@@ -145,110 +241,122 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         
-        reader.onerror = function() {
-            addLog('Erro ao ler o arquivo', 'error');
-            updateProgress(0);
-            processBtn.disabled = false;
+        reader.onload = (e) => {
+            try {
+                processFileContent(e.target.result);
+            } catch (error) {
+                handleProcessingError(error);
+            }
         };
         
-        reader.readAsText(selectedFile);
+        reader.onerror = () => {
+            handleProcessingError(new Error('Falha ao ler o arquivo'));
+        };
+        
+        reader.readAsText(AppState.selectedFile);
     }
-    
-    function processXmlTxt(content) {
-        // Dividir em linhas e processar
+
+    function processFileContent(content) {
+        addLog('Processando conteúdo...', 'info');
+        
+        // Processar linhas do arquivo
         const lines = content.split(/\r?\n/);
-        let inCli = false;
+        let inCliBlock = false;
         let buffer = [];
         let output = [];
-        let cliCount = 0;
+        let cliBlocksProcessed = 0;
         
         for (const line of lines) {
             const trimmed = line.trim();
-            
             if (!trimmed) continue;
             
-            // Detectar início do bloco Cli
+            // Detectar blocos Cli
             if (trimmed.startsWith('<Cli') || trimmed.includes('<Cli')) {
-                inCli = true;
-                cliCount++;
+                inCliBlock = true;
             }
             
-            if (inCli) {
+            if (inCliBlock) {
                 buffer.push(trimmed);
                 
-                // Detectar fim do bloco Cli
                 if (trimmed.endsWith('</Cli>') || trimmed.includes('</Cli>')) {
-                    inCli = false;
+                    inCliBlock = false;
                     output.push(buffer.join(''));
                     buffer = [];
+                    cliBlocksProcessed++;
                 }
             } else {
                 output.push(trimmed);
             }
         }
         
-        // Adicionar qualquer buffer restante
-        if (buffer.length) {
+        // Finalizar processamento
+        if (buffer.length > 0) {
             output.push(buffer.join(''));
         }
         
-        addLog(`Total de blocos <Cli> processados: ${cliCount}`);
-        return output.join('\n');
-    }
-    
-    function downloadSample() {
-        const sampleContent = `<Cli Cd="00709672" Tp="2" Autorzc="S" PorteCli="2" TpCtrl="01" IniRelactCli="2012-05-11" FatAnual="972723.00">
-<Op DetCli="00709672000170" IPOC="0490297902992007096720000010" Contrt="000000000010" Mod="0299" OrigemRec="0199" Indx="11" PercIndx="0.0000000" VarCamb="790" CEP="77880000" TaxEft="2.20" DtContr="2012-11-28" VlrContr="22925.56" NatuOp="01" DtVencOp="2013-11-28" ProvConsttd="0.00" DiaAtraso="4354" CaracEspecial="1;11;19">
-<Venc v330="10454.94" />
-<Gar Tp="0901" Ident="19161565172" PercGar="100.00" />
-<Gar Tp="0901" Ident="46867864287" PercGar="100.00" />
-<ContInstFinRes4966 ClasAtFin="1" CartProvMin="C5" EstInstFin="3" VlrContBr="10454.94" TJE="2.20" />
-</Op>
-</Cli>`;
+        const processedContent = output.join('\n');
+        createDownload(processedContent, AppState.selectedFile.name);
         
-        const blob = new Blob([sampleContent], { type: 'text/xml' });
-        const url = URL.createObjectURL(blob);
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'exemplo_serio.xml';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        addLog('Exemplo XML baixado com sucesso!', 'success');
+        addLog(`Processamento concluído! Blocos <Cli> processados: ${cliBlocksProcessed}`, 'success');
+        updateProgress(100);
     }
-    
-    function updateProgress(percent) {
-        progressBar.style.width = `${percent}%`;
-        progressText.textContent = `${percent}%`;
+
+    function handleProcessingError(error) {
+        addLog(`Erro durante o processamento: ${error.message}`, 'error');
+        updateProgress(0);
+        UI.dropZone.classList.remove('processing');
+        UI.processBtn.disabled = false;
+        AppState.isProcessing = false;
     }
-    
-    function addLog(message, type = 'info', replaceLast = false) {
-        if (replaceLast && logContent.lastChild) {
-            logContent.removeChild(logContent.lastChild);
+
+    function createDownload(content, originalFilename) {
+        try {
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const downloadLink = document.createElement('a');
+            
+            // Criar nome do arquivo de saída
+            const newFilename = originalFilename.replace(/(\.\w+)$/, '_ALTERADO$1');
+            
+            downloadLink.href = url;
+            downloadLink.download = newFilename;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            URL.revokeObjectURL(url);
+            
+            addLog(`Arquivo "${newFilename}" gerado para download`, 'success');
+        } catch (error) {
+            addLog(`Erro ao criar download: ${error.message}`, 'error');
+        } finally {
+            UI.dropZone.classList.remove('processing');
+            UI.processBtn.disabled = false;
+            AppState.isProcessing = false;
         }
-        
-        const logEntry = document.createElement('div');
-        logEntry.className = `log-entry log-${type}`;
-        
-        const timestamp = new Date().toLocaleTimeString();
-        logEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
-        
-        logContent.appendChild(logEntry);
-        logContent.scrollTop = logContent.scrollHeight;
     }
-    
-    function clearLog() {
-        logContent.innerHTML = '<div class="log-entry">Log limpo</div>';
+
+    // Exemplo de arquivo
+    function downloadSampleFile() {
+        const sampleContent = `É o Rafa vida.... Ta achando q vai ser mamão assim? Sobe o XML vc ai pô. Quer tudo mamão? Quer docinho? Ai não dá né?`;
+        
+        try {
+            const blob = new Blob([sampleContent], { type: 'text/xml' });
+            const url = URL.createObjectURL(blob);
+            const downloadLink = document.createElement('a');
+            
+            downloadLink.href = url;
+            downloadLink.download = 'exemplo_serio.xml';
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            URL.revokeObjectURL(url);
+            
+            addLog('E não é q vc baixou mesmo?!', 'success');
+        } catch (error) {
+            addLog(`Erro ao baixar exemplo: ${error.message}`, 'error');
+        }
     }
-    
-    function formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
+
+    // Iniciar a aplicação
+    init();
 });

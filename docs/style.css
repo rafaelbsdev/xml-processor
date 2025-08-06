@@ -6,6 +6,8 @@
     --dark: #2c3e50;
     --gray: #95a5a6;
     --error: #e74c3c;
+    --warning: #f39c12;
+    --background: #1a2a3a;
 }
 
 * {
@@ -16,13 +18,14 @@
 }
 
 body {
-    background: linear-gradient(135deg, #1a2a3a, #2c3e50);
+    background: linear-gradient(135deg, var(--background), var(--primary));
     color: var(--light);
     min-height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 20px;
+    line-height: 1.6;
 }
 
 .container {
@@ -61,6 +64,7 @@ main {
     padding: 30px;
 }
 
+/* Área de Upload */
 .upload-area {
     background: rgba(0, 0, 0, 0.15);
     border: 2px dashed rgba(255, 255, 255, 0.2);
@@ -71,28 +75,115 @@ main {
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
+    cursor: pointer;
+}
+
+.upload-area:hover {
+    background: rgba(0, 0, 0, 0.2);
 }
 
 .upload-area.active {
     border-color: var(--accent);
-    background: rgba(46, 204, 113, 0.05);
+    background: rgba(46, 204, 113, 0.1);
 }
 
-.upload-area p {
-    margin: 15px 0;
-    font-size: 1.1rem;
-}
-
-.upload-icon {
-    font-size: 60px;
-    color: var(--secondary);
-    margin-bottom: 15px;
+.upload-area.active .upload-icon i {
+    transform: scale(1.1);
 }
 
 #fileInput {
     display: none;
 }
 
+.upload-icon {
+    font-size: 60px;
+    color: var(--secondary);
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+}
+
+.upload-icon i {
+    transition: all 0.3s ease;
+}
+
+.upload-message {
+    transition: all 0.3s ease;
+}
+
+.main-message {
+    font-size: 1.1rem;
+    margin-bottom: 10px;
+    font-weight: 500;
+}
+
+.secondary-message {
+    color: var(--gray);
+    margin-bottom: 15px;
+    font-size: 0.95rem;
+}
+
+.file-info {
+    display: none;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    padding: 15px;
+    margin-top: 20px;
+    text-align: left;
+    animation: fadeIn 0.3s ease;
+    width: 100%;
+}
+
+.file-info.show {
+    display: flex;
+}
+
+.file-icon {
+    font-size: 30px;
+    color: var(--secondary);
+    margin-right: 15px;
+    flex-shrink: 0;
+}
+
+.file-details {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.file-name {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-size {
+    color: var(--gray);
+    font-size: 0.9rem;
+    display: block;
+}
+
+.clear-file {
+    background: transparent;
+    border: none;
+    color: var(--gray);
+    cursor: pointer;
+    padding: 5px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    margin-left: 10px;
+}
+
+.clear-file:hover {
+    color: var(--error);
+    transform: scale(1.1);
+}
+
+/* Botões */
 button {
     background: var(--secondary);
     color: white;
@@ -125,6 +216,14 @@ button:disabled:hover {
     background: var(--gray);
 }
 
+.upload-button {
+    background: var(--accent);
+}
+
+.upload-button:hover {
+    background: #219653;
+}
+
 .actions {
     display: flex;
     justify-content: center;
@@ -133,14 +232,7 @@ button:disabled:hover {
     flex-wrap: wrap;
 }
 
-#downloadSampleBtn {
-    background: var(--accent);
-}
-
-#downloadSampleBtn:hover {
-    background: #219653;
-}
-
+/* Progresso */
 .progress-container {
     background: rgba(0, 0, 0, 0.15);
     border-radius: 15px;
@@ -177,6 +269,7 @@ button:disabled:hover {
     border-radius: 10px;
 }
 
+/* Área de Log */
 .log-container {
     background: rgba(0, 0, 0, 0.15);
     border-radius: 15px;
@@ -199,16 +292,6 @@ button:disabled:hover {
     font-size: 1.3rem;
 }
 
-#clearLogBtn {
-    background: var(--error);
-    padding: 8px 15px;
-    font-size: 0.9rem;
-}
-
-#clearLogBtn:hover {
-    background: #c0392b;
-}
-
 .log-content {
     height: 200px;
     overflow-y: auto;
@@ -226,6 +309,25 @@ button:disabled:hover {
     border-bottom: none;
 }
 
+.log-entry.log-error {
+    color: var(--error);
+}
+
+.log-entry.log-success {
+    color: var(--accent);
+}
+
+.log-entry.log-warning {
+    color: var(--warning);
+}
+
+.timestamp {
+    color: var(--gray);
+    font-size: 0.8em;
+    margin-right: 5px;
+}
+
+/* Rodapé */
 footer {
     text-align: center;
     padding: 20px;
@@ -234,14 +336,72 @@ footer {
     color: var(--gray);
 }
 
+footer p {
+    margin-bottom: 5px;
+}
+
+/* Animações */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* Estados especiais */
+.processing .upload-icon i {
+    animation: pulse 1.5s infinite;
+    color: var(--accent);
+}
+
+.error-state {
+    border-color: var(--error) !important;
+    animation: shake 0.5s;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-5px); }
+    40%, 80% { transform: translateX(5px); }
+}
+
 /* Responsividade */
 @media (max-width: 768px) {
+    .container {
+        border-radius: 15px;
+    }
+    
+    header {
+        padding: 20px;
+    }
+    
     header h1 {
         font-size: 1.8rem;
     }
     
+    main {
+        padding: 20px;
+    }
+    
     .upload-area {
         padding: 30px 15px;
+    }
+    
+    .upload-icon {
+        font-size: 50px;
+    }
+    
+    .file-info {
+        padding: 10px;
+    }
+    
+    .file-icon {
+        font-size: 24px;
+        margin-right: 10px;
     }
     
     .actions {
@@ -253,5 +413,9 @@ footer {
         width: 100%;
         max-width: 300px;
         justify-content: center;
+    }
+    
+    .log-content {
+        height: 150px;
     }
 }

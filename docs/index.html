@@ -20,9 +20,21 @@
                 <div class="upload-icon">
                     <i class="fas fa-cloud-upload-alt"></i>
                 </div>
-                <p>Arraste e solte seu arquivo XML/TXT aqui</p>
-                <p>ou</p>
-                <button id="selectFileBtn">Selecionar Arquivo</button>
+                <div class="upload-message">
+                    <p class="main-message">Arraste e solte seu arquivo XML/TXT aqui</p>
+                    <p class="secondary-message">ou</p>
+                    <button id="selectFileBtn">Selecionar Arquivo</button>
+                </div>
+                <div class="file-info" id="fileInfo">
+                    <i class="fas fa-file-alt file-icon"></i>
+                    <div class="file-details">
+                        <span class="file-name" id="fileName">Nenhum arquivo selecionado</span>
+                        <span class="file-size" id="fileSize"></span>
+                    </div>
+                    <button class="clear-file" id="clearFileBtn" title="Remover arquivo">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
             </div>
             
             <div class="actions">
