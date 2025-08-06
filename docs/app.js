@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Constantes de configuração
-    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
     const ALLOWED_FILE_TYPES = ['xml', 'txt'];
     
     // Elementos da UI
@@ -113,12 +112,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const fileExtension = getFileExtension(file.name);
         if (!ALLOWED_FILE_TYPES.includes(fileExtension)) {
             showError(`Tipo de arquivo não suportado. Use: ${ALLOWED_FILE_TYPES.join(', ')}`);
-            return;
-        }
-
-        // Validação do tamanho do arquivo
-        if (file.size > MAX_FILE_SIZE) {
-            showError(`Arquivo muito grande. Tamanho máximo: ${formatFileSize(MAX_FILE_SIZE)}`);
             return;
         }
 
