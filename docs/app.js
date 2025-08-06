@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressText = document.getElementById('progressText');
     const logContent = document.getElementById('logContent');
     const clearLogBtn = document.getElementById('clearLogBtn');
+    const uploadIcon = dropZone.querySelector('.upload-icon i');
     
     let selectedFile = null;
     
@@ -42,10 +43,14 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function highlight() {
         dropZone.classList.add('active');
+        uploadIcon.className = 'fas fa-file-upload';
+        uploadIcon.style.color = '#27ae60';
     }
     
     function unhighlight() {
         dropZone.classList.remove('active');
+        uploadIcon.className = 'fas fa-cloud-upload-alt';
+        uploadIcon.style.color = '#3498db';
     }
     
     function handleDrop(e) {
@@ -56,6 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function handleFileSelect(e) {
         handleFiles(e.target.files);
+        // Resetar o input para permitir selecionar o mesmo arquivo novamente
+        e.target.value = '';
     }
     
     function handleFiles(files) {
@@ -71,7 +78,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         selectedFile = file;
+        
+        // Atualizar a interface
+        uploadIcon.className = 'fas fa-file-alt';
+        uploadIcon.style.color = '#f39c12';
+        dropZone.querySelector('p').textContent = fileName;
+        
         addLog(`Arquivo selecionado: ${fileName}`);
+        addLog(`Tamanho: ${formatFileSize(file.size)}`);
         processBtn.disabled = false;
     }
     
@@ -84,8 +98,13 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const reader = new FileReader();
         
+        reader.onloadstart = function() {
+            addLog('Lendo arquivo...');
+        };
+        
         reader.onload = function(e) {
             try {
+                addLog('Processando conteúdo...');
                 const content = e.target.result;
                 const processedContent = processXmlTxt(content);
                 
@@ -122,7 +141,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.lengthComputable) {
                 const percent = Math.round((e.loaded / e.total) * 100);
                 updateProgress(percent);
+                addLog(`Progresso: ${percent}%`, 'info', true);
             }
+        };
+        
+        reader.onerror = function() {
+            addLog('Erro ao ler o arquivo', 'error');
+            updateProgress(0);
+            processBtn.disabled = false;
         };
         
         reader.readAsText(selectedFile);
@@ -134,6 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let inCli = false;
         let buffer = [];
         let output = [];
+        let cliCount = 0;
         
         for (const line of lines) {
             const trimmed = line.trim();
@@ -143,6 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Detectar início do bloco Cli
             if (trimmed.startsWith('<Cli') || trimmed.includes('<Cli')) {
                 inCli = true;
+                cliCount++;
             }
             
             if (inCli) {
@@ -164,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
             output.push(buffer.join(''));
         }
         
+        addLog(`Total de blocos <Cli> processados: ${cliCount}`);
         return output.join('\n');
     }
     
@@ -196,15 +225,30 @@ document.addEventListener('DOMContentLoaded', () => {
         progressText.textContent = `${percent}%`;
     }
     
-    function addLog(message, type = 'info') {
+    function addLog(message, type = 'info', replaceLast = false) {
+        if (replaceLast && logContent.lastChild) {
+            logContent.removeChild(logContent.lastChild);
+        }
+        
         const logEntry = document.createElement('div');
         logEntry.className = `log-entry log-${type}`;
-        logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        
+        const timestamp = new Date().toLocaleTimeString();
+        logEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
+        
         logContent.appendChild(logEntry);
         logContent.scrollTop = logContent.scrollHeight;
     }
     
     function clearLog() {
         logContent.innerHTML = '<div class="log-entry">Log limpo</div>';
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 });
