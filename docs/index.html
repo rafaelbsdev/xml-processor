@@ -3,85 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Processador Bancário XML/TXT</title>
+    <title>Processador Bancário Web</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <header>
-        <h1>Processador Bancário XML/TXT</h1>
-        <p>Aplicação para processamento de arquivos bancários com milhões de registros</p>
-    </header>
-    
-    <main>
-        <section class="hero">
-            <img src="images/screenshot.png" alt="Captura de tela da aplicação">
-            <div class="hero-content">
-                <h2>Transforme arquivos bancários complexos em formato simplificado</h2>
-                <p>Processa milhões de registros XML/TXT e transforma blocos &lt;Cli&gt; em linhas únicas</p>
-                <a href="#download" class="btn">Baixar Agora</a>
-            </div>
-        </section>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-file-code"></i> Processador Bancário Web</h1>
+            <p>Transforme blocos &lt;Cli&gt; em linhas únicas diretamente no navegador</p>
+        </header>
         
-        <section id="features">
-            <h2>Recursos Principais</h2>
-            <div class="features-grid">
-                <div class="feature">
-                    <h3>⚡ Processamento Rápido</h3>
-                    <p>Otimizado para lidar com arquivos de até 3 milhões de linhas</p>
+        <main>
+            <div class="upload-area" id="dropZone">
+                <input type="file" id="fileInput" accept=".xml,.txt">
+                <div class="upload-icon">
+                    <i class="fas fa-cloud-upload-alt"></i>
                 </div>
-                <div class="feature">
-                    <h3>🔄 Conversão Automática</h3>
-                    <p>Transforma blocos XML em linhas únicas com um clique</p>
+                <p>Arraste e solte seu arquivo XML/TXT aqui</p>
+                <p>ou</p>
+                <button id="selectFileBtn">Selecionar Arquivo</button>
+            </div>
+            
+            <div class="actions">
+                <button id="processBtn" disabled>
+                    <i class="fas fa-cogs"></i> Processar Arquivo
+                </button>
+                <button id="downloadSampleBtn">
+                    <i class="fas fa-download"></i> Baixar Exemplo
+                </button>
+            </div>
+            
+            <div class="progress-container">
+                <div class="progress-header">
+                    <h2><i class="fas fa-tasks"></i> Progresso</h2>
+                    <span id="progressText">0%</span>
                 </div>
-                <div class="feature">
-                    <h3>📊 Interface Amigável</h3>
-                    <p>Barra de progresso e logs detalhados para acompanhamento</p>
+                <div class="progress-bar">
+                    <div class="progress" id="progressBar"></div>
                 </div>
             </div>
-        </section>
+            
+            <div class="log-container">
+                <div class="log-header">
+                    <h2><i class="fas fa-terminal"></i> Log de Execução</h2>
+                    <button id="clearLogBtn"><i class="fas fa-trash"></i> Limpar</button>
+                </div>
+                <div class="log-content" id="logContent">
+                    <div class="log-entry">Pronto para iniciar</div>
+                </div>
+            </div>
+        </main>
         
-        <section id="download">
-            <h2>Baixar o Programa</h2>
-            <div class="download-options">
-                <div class="option">
-                    <h3>Windows</h3>
-                    <p>Executável pronto para usar</p>
-                    <a href="https://github.com/rafaelbsdev/xml-processor/releases/latest/download/xml-processor-windows.exe" class="btn">Baixar para Windows</a>
-                </div>
-                <div class="option">
-                    <h3>Código Fonte</h3>
-                    <p>Para executar em qualquer sistema</p>
-                    <a href="https://github.com/rafaelbsdev/xml-processor/archive/refs/heads/main.zip" class="btn">Baixar Código Fonte</a>
-                </div>
-            </div>
-        </section>
-        
-        <section id="installation">
-            <h2>Como Instalar e Usar</h2>
-            <div class="steps">
-                <div class="step">
-                    <h3>1. Baixe o programa</h3>
-                    <p>Escolha a versão para Windows ou o código fonte</p>
-                </div>
-                <div class="step">
-                    <h3>2. Instale as dependências</h3>
-                    <p>Para o código fonte, execute:</p>
-                    <code>pip install -r requirements.txt</code>
-                </div>
-                <div class="step">
-                    <h3>3. Execute o programa</h3>
-                    <p>Para Windows: clique no executável<br>
-                    Para código fonte: <code>python run.py</code></p>
-                </div>
-            </div>
-        </section>
-    </main>
-    
-    <footer>
-        <p>© 2023 Processador Bancário - Desenvolvido com Python</p>
-        <p><a href="https://github.com/seu-usuario/xml-processor">Ver código fonte no GitHub</a></p>
-    </footer>
-    
-    <script src="script.js"></script>
+        <footer>
+            <p>Processa arquivos bancários XML/TXT com milhões de registros</p>
+            <p>Desenvolvido com ❤️ para GitHub Pages</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
 </body>
 </html>
