@@ -211,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'exemplo_bancario.xml';
+        a.download = 'exemplo_serio.xml';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
