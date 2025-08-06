@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function formatFileSize(bytes) {
         if (bytes === 0) return '0 Bytes';
-        const units = ['Bytes', 'KB', 'MB', 'GB'];
+        const units = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
         const unitIndex = Math.floor(Math.log(bytes) / Math.log(1024));
         return `${(bytes / Math.pow(1024, unitIndex)).toFixed(2)} ${units[unitIndex]}`;
     }
@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.lengthComputable) {
                 const percent = Math.round((e.loaded / e.total) * 100);
                 updateProgress(percent);
-                addLog(`Progresso: ${percent}%`, 'info', true);
+                addLog(`Progresso da leitura: ${percent}%`, 'info', true);
             }
         };
         
@@ -258,9 +258,21 @@ document.addEventListener('DOMContentLoaded', () => {
         let buffer = [];
         let output = [];
         let cliBlocksProcessed = 0;
+        let linesProcessed = 0;
+        const totalLines = lines.length;
+        const updateInterval = Math.floor(totalLines / 100) || 1; // Atualizar a cada ~1%
         
         for (const line of lines) {
             const trimmed = line.trim();
+            linesProcessed++;
+            
+            // Atualizar progresso periodicamente
+            if (linesProcessed % updateInterval === 0) {
+                const progress = Math.round((linesProcessed / totalLines) * 100);
+                updateProgress(progress);
+                addLog(`Processando linha ${linesProcessed} de ${totalLines} (${progress}%)`, 'info', true);
+            }
+            
             if (!trimmed) continue;
             
             // Detectar blocos Cli
@@ -290,7 +302,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const processedContent = output.join('\n');
         createDownload(processedContent, AppState.selectedFile.name);
         
-        addLog(`Processamento concluído! Blocos <Cli> processados: ${cliBlocksProcessed}`, 'success');
+        addLog(`Processamento concluído!`, 'success');
+        addLog(`Linhas processadas: ${linesProcessed}`, 'info');
+        addLog(`Blocos <Cli> processados: ${cliBlocksProcessed}`, 'info');
         updateProgress(100);
     }
 
@@ -304,6 +318,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function createDownload(content, originalFilename) {
         try {
+            addLog('Preparando arquivo para download...', 'info');
+            
             const blob = new Blob([content], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const downloadLink = document.createElement('a');
@@ -316,9 +332,11 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.appendChild(downloadLink);
             downloadLink.click();
             document.body.removeChild(downloadLink);
-            URL.revokeObjectURL(url);
             
-            addLog(`Arquivo "${newFilename}" gerado para download`, 'success');
+            // Liberar memória
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+            
+            addLog(`Download do arquivo "${newFilename}" iniciado`, 'success');
         } catch (error) {
             addLog(`Erro ao criar download: ${error.message}`, 'error');
         } finally {
@@ -338,13 +356,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const downloadLink = document.createElement('a');
             
             downloadLink.href = url;
-            downloadLink.download = 'exemplo_serio.xml';
+            downloadLink.download = 'exemplo_bancario.xml';
             document.body.appendChild(downloadLink);
             downloadLink.click();
             document.body.removeChild(downloadLink);
-            URL.revokeObjectURL(url);
             
-            addLog('E não é q vc baixou mesmo?!', 'success');
+            // Liberar memória
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+            
+            addLog('Exemplo XML baixado com sucesso!', 'success');
         } catch (error) {
             addLog(`Erro ao baixar exemplo: ${error.message}`, 'error');
         }
