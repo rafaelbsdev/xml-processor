@@ -1,5 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Constantes de configuração
+    // ---- CONFIGURAÇÃO ----
+    // Altere o nome da tag que deve ser removida no XML simplificado aqui.
+    const TAG_TO_REMOVE = 'Cmp';
+
     const ALLOWED_FILE_TYPES = ['xml', 'txt'];
     const ENCODING = 'utf-8';
 
@@ -45,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.clearLogBtn.addEventListener('click', clearLog);
         
         const dropZone = document.getElementById('dropZone');
-        const dragEvents = ['dragenter', 'dragover', 'dragleave', 'drop'];
+        const dragEvents = ['dragenter', 'dragover', 'dragenter', 'dragleave', 'drop'];
         dragEvents.forEach(eventName => {
             dropZone.addEventListener(eventName, preventDefaults, false);
         });
@@ -196,7 +199,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let currentCliCd = '';
         let currentOpNum = '';
-        let inCmpBlock = false;
+
+        const startTagToRemove = `<${TAG_TO_REMOVE}`;
+        const endTagToRemove = `</${TAG_TO_REMOVE}>`;
 
         try {
             while (true) {
@@ -231,14 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             currentCliCd = '';
                         }
                     } else if (outputType === 'xml_simplificado') {
-                        if (trimmed.startsWith('<Cmp')) {
-                            inCmpBlock = true;
-                        } else if (trimmed.startsWith('</Cmp>')) {
-                            inCmpBlock = false;
-                            continue;
-                        }
-
-                        if (!inCmpBlock) {
+                        if (!trimmed.startsWith(startTagToRemove) && !trimmed.startsWith(endTagToRemove)) {
                             simplifiedXml += `${line}\n`;
                         }
                     }
@@ -262,13 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
                      }
                  } else if (outputType === 'xml_simplificado') {
                      const trimmed = contentBuffer.trim();
-                     if (trimmed.startsWith('<Cmp')) {
-                         inCmpBlock = true;
-                     } else if (trimmed.startsWith('</Cmp>')) {
-                         inCmpBlock = false;
-                     }
-
-                     if (!inCmpBlock) {
+                     if (!trimmed.startsWith(startTagToRemove) && !trimmed.startsWith(endTagToRemove)) {
                          simplifiedXml += `${contentBuffer}\n`;
                      }
                  }
@@ -281,7 +273,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     garantias: garantiasXml
                 }, file.name);
             } else if (outputType === 'xml_simplificado') {
-                // Adiciona o cabeçalho e tag raiz somente aqui, após a filtragem
                 const finalSimplifiedXml = `<?xml version="1.0" encoding="utf-8"?>\n<root>\n${simplifiedXml.trim()}\n</root>`;
                 downloadFile(finalSimplifiedXml, file.name, 'xml');
             }
@@ -305,7 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let blobType;
 
         if (type === 'xml') {
-            newFilename = `${baseName}_SIMPLIFICADO.xml`;
+            newFilename = `${baseName}_Alterado.xml`;
             blobType = 'application/xml';
         } else {
             newFilename = `${baseName}.txt`;
@@ -319,7 +310,6 @@ document.addEventListener('DOMContentLoaded', () => {
         a.download = newFilename;
         document.body.appendChild(a);
         
-        // Adicionando um pequeno atraso para garantir que o elemento esteja no DOM antes de ser clicado
         setTimeout(() => {
             a.click();
             document.body.removeChild(a);
