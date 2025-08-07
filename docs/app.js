@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let clientesXml = '';
         let operacoesXml = '';
         let garantiasXml = '';
-        let simplifiedXml = '';
+        let simplifiedXml = '<?xml version="1.0" encoding="utf-8"?>\n<root>\n'; // Adicionado o cabeçalho XML e tag raiz
 
         let currentCliCd = '';
         let currentOpNum = '';
@@ -230,7 +230,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             currentCliCd = '';
                         }
                     } else if (outputType === 'xml_simplificado') {
-                        // Lógica para simplificar o XML (removendo tags <Cmp>)
                         if (!trimmed.startsWith('<Cmp') && !trimmed.startsWith('</Cmp>')) {
                             simplifiedXml += `${line}\n`;
                         }
@@ -268,6 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     garantias: garantiasXml
                 }, file.name);
             } else if (outputType === 'xml_simplificado') {
+                simplifiedXml += '</root>'; // Fecha a tag raiz
                 downloadFile(simplifiedXml, file.name, 'xml');
             }
 
@@ -303,8 +303,10 @@ document.addEventListener('DOMContentLoaded', () => {
         a.href = url;
         a.download = newFilename;
         document.body.appendChild(a);
-        a.click();
+        
+        // Adicionando um pequeno atraso para garantir que o elemento esteja no DOM antes de ser clicado
         setTimeout(() => {
+            a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }, 100);
