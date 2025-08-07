@@ -38,9 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         UI.fileInput.addEventListener('change', handleFileSelection);
         
-        // O botão 'Gerar Excel' agora aciona a lógica de geração de ZIP
         UI.processExcelBtn.addEventListener('click', () => processFile('zip'));
-        
         UI.processXmlBtn.addEventListener('click', () => processFile('xml'));
         UI.clearFileBtn.addEventListener('click', clearFileSelection);
         UI.downloadSampleBtn.addEventListener('click', downloadSampleFile);
@@ -229,8 +227,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // Adicionar o restante do buffer
             if (contentBuffer.length > 0) {
                  if (outputType === 'zip') {
-                     // Lógica para separar em 3 XMLs
-                     // Isso garante que a última tag seja processada caso o arquivo não termine com uma quebra de linha
                      const trimmed = contentBuffer.trim();
                      if (trimmed.startsWith('<Cli') || trimmed.includes('</Cli>')) {
                          clientesXml += `${trimmed}\n`;
@@ -244,9 +240,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (outputType === 'zip') {
                 createZipExport({
-                    '_Cli.xml': clientesXml,
-                    '_Op.xml': operacoesXml,
-                    '_Gar.xml': garantiasXml
+                    clientes: clientesXml,
+                    operacoes: operacoesXml,
+                    garantias: garantiasXml
                 }, file.name);
             } else if (outputType === 'xml') {
                 // Lógica de download do XML simplificado
@@ -270,14 +266,17 @@ document.addEventListener('DOMContentLoaded', () => {
             addLog('Criando arquivo ZIP...', 'info');
             const zip = new JSZip();
 
-            // Envolve cada conteúdo XML com uma tag raiz
-            const clientesContent = `<root>${files['_Cli.xml']}</root>`;
-            const operacoesContent = `<root>${files['_Op.xml']}</root>`;
-            const garantiasContent = `<root>${files['_Gar.xml']}</root>`;
+            // Extrai o nome base do arquivo original, removendo a extensão
+            const baseName = originalFilename.replace(/\.[^/.]+$/, '');
 
-            zip.file('_Cli.xml', clientesContent);
-            zip.file('_Op.xml', operacoesContent);
-            zip.file('_Gar.xml', garantiasContent);
+            // Envolve cada conteúdo XML com uma tag raiz e usa o novo nome
+            const clientesContent = `<root>${files.clientes}</root>`;
+            const operacoesContent = `<root>${files.operacoes}</root>`;
+            const garantiasContent = `<root>${files.garantias}</root>`;
+
+            zip.file(`${baseName}_CLI.xml`, clientesContent);
+            zip.file(`${baseName}_OP.xml`, operacoesContent);
+            zip.file(`${baseName}_GAR.xml`, garantiasContent);
 
             zip.generateAsync({ type: 'blob' }).then(content => {
                 const newFilename = originalFilename.replace(/(\.\w+)$/, '.zip');
