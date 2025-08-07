@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
         fileInput: document.getElementById('fileInput'),
         dropZone: document.getElementById('dropZone'),
         selectFileBtn: document.getElementById('selectFileBtn'),
-        processExcelBtn: document.getElementById('processExcelBtn'), // Agora usado para gerar o ZIP
+        processExcelBtn: document.getElementById('processExcelBtn'),
         processXmlBtn: document.getElementById('processXmlBtn'),
         downloadSampleBtn: document.getElementById('downloadSampleBtn'),
         clearFileBtn: document.getElementById('clearFileBtn'),
@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         UI.fileInput.addEventListener('change', handleFileSelection);
         
-        // O botão 'Gerar Excel' agora acionará a lógica de geração de ZIP
+        // O botão 'Gerar Excel' agora aciona a lógica de geração de ZIP
         UI.processExcelBtn.addEventListener('click', () => processFile('zip'));
         
         UI.processXmlBtn.addEventListener('click', () => processFile('xml'));
@@ -185,10 +185,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let bytesProcessed = 0;
         const totalBytes = file.size;
         
-        // Buffers para os novos arquivos XML
-        let clientesXml = '<Clientes>';
-        let operacoesXml = '<Operacoes>';
-        let garantiasXml = '<Garantias>';
+        let clientesXml = '';
+        let operacoesXml = '';
+        let garantiasXml = '';
 
         try {
             while (true) {
@@ -208,20 +207,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (outputType === 'zip') {
                         // Lógica para separar em 3 XMLs
                         if (trimmed.startsWith('<Cli')) {
-                            clientesXml += trimmed;
+                            clientesXml += `${trimmed}\n`;
                         } else if (trimmed.startsWith('<Op')) {
-                            operacoesXml += trimmed;
+                            operacoesXml += `${trimmed}\n`;
                         } else if (trimmed.startsWith('<Venc') || trimmed.startsWith('<ContInstFinRes4966')) {
-                            garantiasXml += trimmed;
+                            garantiasXml += `${trimmed}\n`;
                         } else if (trimmed.includes('</Op>')) {
-                            operacoesXml += trimmed;
+                            operacoesXml += `${trimmed}\n`;
                         } else if (trimmed.includes('</Cli>')) {
-                            clientesXml += trimmed;
+                            clientesXml += `${trimmed}\n`;
                         }
                     } else if (outputType === 'xml') {
                         // Lógica original de simplificação
-                        // Este código está aqui por consistência, mas não foi fornecido
-                        // na versão anterior do usuário, então é apenas um placeholder.
                     }
                 }
                 const progress = Math.round((bytesProcessed / totalBytes) * 100);
@@ -233,16 +230,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (contentBuffer.length > 0) {
                  if (outputType === 'zip') {
                      // Lógica para separar em 3 XMLs
-                     // Assume-se que o buffer final não conterá tags completas,
-                     // então não há muito o que fazer aqui, a menos que o arquivo termine
-                     // exatamente no final de uma tag.
+                     // Isso garante que a última tag seja processada caso o arquivo não termine com uma quebra de linha
+                     const trimmed = contentBuffer.trim();
+                     if (trimmed.startsWith('<Cli') || trimmed.includes('</Cli>')) {
+                         clientesXml += `${trimmed}\n`;
+                     } else if (trimmed.startsWith('<Op') || trimmed.includes('</Op>')) {
+                         operacoesXml += `${trimmed}\n`;
+                     } else if (trimmed.startsWith('<Venc') || trimmed.startsWith('<ContInstFinRes4966')) {
+                         garantiasXml += `${trimmed}\n`;
+                     }
                  }
             }
-
-            // Finalizar os XMLs
-            clientesXml += '</Clientes>';
-            operacoesXml += '</Operacoes>';
-            garantiasXml += '</Garantias>';
 
             if (outputType === 'zip') {
                 createZipExport({
@@ -272,9 +270,14 @@ document.addEventListener('DOMContentLoaded', () => {
             addLog('Criando arquivo ZIP...', 'info');
             const zip = new JSZip();
 
-            for (const filename in files) {
-                zip.file(filename, files[filename]);
-            }
+            // Envolve cada conteúdo XML com uma tag raiz
+            const clientesContent = `<root>${files['_Cli.xml']}</root>`;
+            const operacoesContent = `<root>${files['_Op.xml']}</root>`;
+            const garantiasContent = `<root>${files['_Gar.xml']}</root>`;
+
+            zip.file('_Cli.xml', clientesContent);
+            zip.file('_Op.xml', operacoesContent);
+            zip.file('_Gar.xml', garantiasContent);
 
             zip.generateAsync({ type: 'blob' }).then(content => {
                 const newFilename = originalFilename.replace(/(\.\w+)$/, '.zip');
