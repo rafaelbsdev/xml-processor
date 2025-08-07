@@ -228,14 +228,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let inCliBlock = false;
         let buffer = [];
-        let currentCliCd = null;
-
+        
         try {
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) {
+                    // Processa o buffer final
                     if (contentBuffer.length > 0) {
-                         contentBuffer.split(/\r?\n/).forEach(line => processLine(line, outputType, { cliData, opData, garData, outputLines, inCliBlock, buffer, currentCliCd }));
+                         processFinalBuffer(contentBuffer, outputType, { cliData, opData, garData, outputLines, inCliBlock, buffer });
+                    }
+                    if (buffer.length > 0) {
+                         processFinalBuffer(buffer.join('\n'), outputType, { cliData, opData, garData, outputLines, inCliBlock, buffer });
                     }
                     break;
                 }
@@ -247,7 +250,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 contentBuffer = lines.pop();
 
                 for (const line of lines) {
-                    processLine(line, outputType, { cliData, opData, garData, outputLines, inCliBlock, buffer, currentCliCd });
+                     // Lógica de processamento isolada para cada linha
+                     processLineByLine(line, outputType, { cliData, opData, garData, outputLines, inCliBlock, buffer });
                 }
 
                 const progress = Math.round((bytesProcessed / totalBytes) * 100);
@@ -255,18 +259,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 addLog(`Progresso: ${progress}% (${bytesProcessed}/${totalBytes} bytes)`, 'info', true);
             }
             
-            // Processa o buffer final
-            if (buffer.length > 0) {
-                 if (outputType === 'xml') {
-                     outputLines.push(buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
-                 } else if (outputType === 'excel') {
-                     processExcelBlock(buffer.join(''), cliData, opData, garData);
-                 }
-            }
-            if (contentBuffer.length > 0 && outputType === 'xml') {
-                 outputLines.push(contentBuffer);
-            }
-
             if (outputType === 'excel') {
                 createExcelExport(cliData, opData, garData, AppState.selectedFile.name);
                 addLog(`Clientes (Cli) processados: ${cliData.length}`, 'info');
@@ -288,12 +280,12 @@ document.addEventListener('DOMContentLoaded', () => {
             AppState.isProcessing = false;
         }
     }
-    
-    // Funções auxiliares para processamento de linha
-    function processLine(line, outputType, state) {
+
+    // Função para processar linhas, separando a lógica de cada tipo de saída
+    function processLineByLine(line, outputType, state) {
         const trimmed = line.trim();
         if (!trimmed) return;
-        
+
         if (trimmed.startsWith('<Cli')) {
             if (state.inCliBlock) {
                  if (outputType === 'xml') {
@@ -304,10 +296,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             state.inCliBlock = true;
             state.buffer = [trimmed];
-            state.currentCliCd = extractAttributes(trimmed).Cd;
             return;
         }
-
+        
         if (state.inCliBlock) {
             state.buffer.push(trimmed);
             
@@ -319,15 +310,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     state.outputLines.push(state.buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
                 }
                 state.buffer = [];
-                state.currentCliCd = null;
                 return;
             }
         } else {
+            // Linhas fora de um bloco Cli (ex: tags de cabeçalho)
             state.outputLines.push(line);
         }
     }
     
-    // Nova função para processar um bloco de XML para o Excel
+    // Funções para processar o buffer final (fim do arquivo)
+    function processFinalBuffer(content, outputType, state) {
+         if (outputType === 'xml') {
+             if (state.inCliBlock && state.buffer.length > 0) {
+                 state.outputLines.push(state.buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
+             } else if (content.length > 0) {
+                 state.outputLines.push(content);
+             }
+         } else if (outputType === 'excel') {
+             if (state.inCliBlock && state.buffer.length > 0) {
+                 processExcelBlock(state.buffer.join(''), state.cliData, state.opData, state.garData);
+             }
+         }
+    }
+    
+    // Lógica para processar um bloco de XML e extrair dados para o Excel
     function processExcelBlock(xmlBlockContent, cliData, opData, garData) {
         const cliMatch = xmlBlockContent.match(/<Cli[^>]*>/);
         if (cliMatch) {
@@ -342,13 +348,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 opAttributes.Cd = cliCd;
                 opData.push(opAttributes);
 
-                const garRegex = /<Gar[^>]*\/>/g;
-                const garMatches = opMatch.match(garRegex) || [];
-                garMatches.forEach(garMatch => {
-                    const garAttributes = extractAttributes(garMatch);
-                    garAttributes.Cd = cliCd;
-                    garData.push(garAttributes);
-                });
+                // Expressão regular para encontrar as tags <Venc> e <ContInstFinRes4966>
+                const subTagRegex = /<(Venc|ContInstFinRes4966)[^>]*\/>/g;
+                let subTagMatch;
+                while ((subTagMatch = subTagRegex.exec(opMatch)) !== null) {
+                    const subTagAttributes = extractAttributes(subTagMatch[0]);
+                    subTagAttributes.Cd = cliCd;
+                    garData.push(subTagAttributes);
+                }
             });
         }
     }
