@@ -19,7 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
         fileInfo: document.getElementById('fileInfo'),
         uploadMessage: document.querySelector('.upload-message'),
         mainMessage: document.querySelector('.main-message'),
-        secondaryMessage: document.querySelector('.secondary-message')
+        secondaryMessage: document.querySelector('.secondary-message'),
+        clearLogBtn: document.getElementById('clearLogBtn'),
     };
 
     // Estado da aplicação
@@ -36,28 +37,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Configuração de event listeners
     function setupEventListeners() {
-        // Upload por clique
         UI.selectFileBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             UI.fileInput.click();
         });
 
-        // Upload por clique na área
         UI.dropZone.addEventListener('click', () => UI.fileInput.click());
-
-        // Seleção de arquivo
         UI.fileInput.addEventListener('change', handleFileSelection);
-
-        // Processamento
         UI.processBtn.addEventListener('click', processFile);
-
-        // Limpar seleção
         UI.clearFileBtn.addEventListener('click', clearFileSelection);
-
-        // Download de exemplo
         UI.downloadSampleBtn.addEventListener('click', downloadSampleFile);
+        UI.clearLogBtn.addEventListener('click', clearLog);
 
-        // Drag and drop
         const dragEvents = ['dragenter', 'dragover', 'dragleave', 'drop'];
         dragEvents.forEach(eventName => {
             UI.dropZone.addEventListener(eventName, preventDefaults, false);
@@ -92,6 +83,16 @@ document.addEventListener('DOMContentLoaded', () => {
         return filename.split('.').pop().toLowerCase();
     }
 
+    function extractAttributes(tagContent) {
+        const attributes = {};
+        const regex = /(\w+)\s*=\s*"([^"]*)"/g;
+        let match;
+        while ((match = regex.exec(tagContent)) !== null) {
+            attributes[match[1]] = match[2];
+        }
+        return attributes;
+    }
+
     // Manipulação de arquivos
     function handleFileSelection(e) {
         const files = e.target.files;
@@ -108,14 +109,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function validateAndLoadFile(file) {
-        // Validação do tipo de arquivo
         const fileExtension = getFileExtension(file.name);
         if (!ALLOWED_FILE_TYPES.includes(fileExtension)) {
             showError(`Tipo de arquivo não suportado. Use: ${ALLOWED_FILE_TYPES.join(', ')}`);
             return;
         }
 
-        // Carregar arquivo válido
         AppState.selectedFile = file;
         updateFileDisplay(file);
         addLog(`Arquivo selecionado: ${file.name}`, 'success');
@@ -152,16 +151,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateFileDisplay(file) {
-        // Atualizar ícone
         UI.uploadIcon.className = 'fas fa-file-alt';
         UI.uploadIcon.style.color = 'var(--warning)';
         
-        // Atualizar informações do arquivo
         UI.fileName.textContent = file.name;
         UI.fileSize.textContent = formatFileSize(file.size);
         UI.fileInfo.classList.add('show');
         
-        // Ocultar mensagem padrão
         UI.uploadMessage.style.display = 'none';
     }
 
@@ -173,15 +169,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showError(message) {
-        // Feedback visual
         UI.uploadIcon.className = 'fas fa-exclamation-circle';
         UI.uploadIcon.style.color = 'var(--error)';
         UI.dropZone.classList.add('error-state');
         
-        // Log do erro
         addLog(`Erro: ${message}`, 'error');
         
-        // Reset após timeout
         setTimeout(() => {
             UI.dropZone.classList.remove('error-state');
             if (!AppState.selectedFile) {
@@ -195,7 +188,17 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.progressText.textContent = `${percent}%`;
     }
 
-    function addLog(message, type = 'info') {
+    function addLog(message, type = 'info', replaceLast = false) {
+        if (replaceLast) {
+            const lastEntry = UI.logContent.lastChild;
+            if (lastEntry) {
+                const timestamp = new Date().toLocaleTimeString();
+                lastEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
+                lastEntry.className = `log-entry log-${type}`;
+                UI.logContent.scrollTop = UI.logContent.scrollHeight;
+                return;
+            }
+        }
         const logEntry = document.createElement('div');
         logEntry.className = `log-entry log-${type}`;
         
@@ -207,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function clearLog() {
-        UI.logContent.innerHTML = '<div class="log-entry">Log limpo</div>';
+        UI.logContent.innerHTML = '<div class="log-entry">Log limpo.</div>';
     }
 
     // Processamento do arquivo
@@ -249,18 +252,16 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsText(AppState.selectedFile);
     }
 
-    // Função principal de processamento de conteúdo
+    // Função principal de processamento de conteúdo (CORRETA)
     function processFileContent(content) {
-        addLog('Processando conteúdo...', 'info');
+        addLog('Processando conteúdo e extraindo dados...', 'info');
         
-        // Estruturas para armazenar os dados
         const cliData = [];
         const opData = [];
         const garData = [];
         let currentCliId = 0;
         let currentOpId = 0;
         
-        // Processar linhas do arquivo
         const lines = content.split(/\r?\n/);
         let inCliBlock = false;
         let inOpBlock = false;
@@ -273,7 +274,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const trimmed = line.trim();
             linesProcessed++;
             
-            // Atualizar progresso
             if (linesProcessed % updateInterval === 0) {
                 const progress = Math.round((linesProcessed / totalLines) * 100);
                 updateProgress(progress);
@@ -282,7 +282,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (!trimmed) continue;
             
-            // Detectar blocos Cli
             if (trimmed.startsWith('<Cli') || trimmed.includes('<Cli')) {
                 inCliBlock = true;
                 currentCliId++;
@@ -290,24 +289,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 continue;
             }
             
-            // Detectar blocos Op dentro de Cli
             if (inCliBlock && (trimmed.startsWith('<Op') || trimmed.includes('<Op'))) {
                 inOpBlock = true;
                 currentOpId++;
-                buffer = [trimmed];
+                buffer.push(trimmed);
                 continue;
             }
             
-            // Detectar Gar dentro de Op
             if (inOpBlock && (trimmed.startsWith('<Gar') || trimmed.includes('<Gar'))) {
                 const garAttributes = extractAttributes(trimmed);
                 garAttributes.idCli = currentCliId;
                 garAttributes.idOp = currentOpId;
                 garData.push(garAttributes);
+                buffer.push(trimmed);
                 continue;
             }
             
-            // Finalizar blocos
             if (inOpBlock && (trimmed.endsWith('/>') || trimmed.includes('</Op>'))) {
                 inOpBlock = false;
                 buffer.push(trimmed);
@@ -330,13 +327,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 continue;
             }
             
-            // Adicionar ao buffer atual
             if (inCliBlock || inOpBlock) {
                 buffer.push(trimmed);
             }
         }
         
-        // Finalizar processamento
         createExcelExport(cliData, opData, garData, AppState.selectedFile.name);
         
         addLog(`Processamento concluído!`, 'success');
@@ -351,27 +346,21 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             addLog('Criando arquivo Excel...', 'info');
             
-            // Criar workbook
             const workbook = XLSX.utils.book_new();
             
-            // Converter dados para planilhas
             const cliSheet = XLSX.utils.json_to_sheet(cliData);
             const opSheet = XLSX.utils.json_to_sheet(opData);
             const garSheet = XLSX.utils.json_to_sheet(garData);
             
-            // Adicionar planilhas ao workbook
             XLSX.utils.book_append_sheet(workbook, cliSheet, 'Cli');
             XLSX.utils.book_append_sheet(workbook, opSheet, 'Op');
             XLSX.utils.book_append_sheet(workbook, garSheet, 'Gar');
             
-            // Gerar o arquivo
             const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
             const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
             
-            // Criar nome do arquivo
             const newFilename = originalFilename.replace(/(\.\w+)$/, '_ALTERADO.xlsx');
             
-            // Criar link de download
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -379,7 +368,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.appendChild(a);
             a.click();
             
-            // Limpeza
             setTimeout(() => {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
@@ -395,101 +383,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function processFileContent(content) {
-        addLog('Processando conteúdo...', 'info');
-        
-        // Processar linhas do arquivo
-        const lines = content.split(/\r?\n/);
-        let inCliBlock = false;
-        let buffer = [];
-        let output = [];
-        let cliBlocksProcessed = 0;
-        let linesProcessed = 0;
-        const totalLines = lines.length;
-        const updateInterval = Math.floor(totalLines / 100) || 1; // Atualizar a cada ~1%
-        
-        for (const line of lines) {
-            const trimmed = line.trim();
-            linesProcessed++;
-            
-            // Atualizar progresso periodicamente
-            if (linesProcessed % updateInterval === 0) {
-                const progress = Math.round((linesProcessed / totalLines) * 100);
-                updateProgress(progress);
-                addLog(`Processando linha ${linesProcessed} de ${totalLines} (${progress}%)`, 'info', true);
-            }
-            
-            if (!trimmed) continue;
-            
-            // Detectar blocos Cli
-            if (trimmed.startsWith('<Cli') || trimmed.includes('<Cli')) {
-                inCliBlock = true;
-            }
-            
-            if (inCliBlock) {
-                buffer.push(trimmed);
-                
-                if (trimmed.endsWith('</Cli>') || trimmed.includes('</Cli>')) {
-                    inCliBlock = false;
-                    output.push(buffer.join(''));
-                    buffer = [];
-                    cliBlocksProcessed++;
-                }
-            } else {
-                output.push(trimmed);
-            }
-        }
-        
-        // Finalizar processamento
-        if (buffer.length > 0) {
-            output.push(buffer.join(''));
-        }
-        
-        const processedContent = output.join('\n');
-        createDownload(processedContent, AppState.selectedFile.name);
-        
-        addLog(`Processamento concluído!`, 'success');
-        addLog(`Linhas processadas: ${linesProcessed}`, 'info');
-        addLog(`Blocos <Cli> processados: ${cliBlocksProcessed}`, 'info');
-        updateProgress(100);
-    }
-
     function handleProcessingError(error) {
         addLog(`Erro durante o processamento: ${error.message}`, 'error');
         updateProgress(0);
         UI.dropZone.classList.remove('processing');
         UI.processBtn.disabled = false;
         AppState.isProcessing = false;
-    }
-
-    function createDownload(content, originalFilename) {
-        try {
-            addLog('Preparando arquivo para download...', 'info');
-            
-            const blob = new Blob([content], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const downloadLink = document.createElement('a');
-            
-            // Criar nome do arquivo de saída
-            const newFilename = originalFilename.replace(/(\.\w+)$/, '_ALTERADO$1');
-            
-            downloadLink.href = url;
-            downloadLink.download = newFilename;
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
-            
-            // Liberar memória
-            setTimeout(() => URL.revokeObjectURL(url), 100);
-            
-            addLog(`Download do arquivo "${newFilename}" iniciado`, 'success');
-        } catch (error) {
-            addLog(`Erro ao criar download: ${error.message}`, 'error');
-        } finally {
-            UI.dropZone.classList.remove('processing');
-            UI.processBtn.disabled = false;
-            AppState.isProcessing = false;
-        }
     }
 
     // Exemplo de arquivo
@@ -507,7 +406,6 @@ document.addEventListener('DOMContentLoaded', () => {
             downloadLink.click();
             document.body.removeChild(downloadLink);
             
-            // Liberar memória
             setTimeout(() => URL.revokeObjectURL(url), 100);
             
             addLog('Exemplo XML baixado com sucesso!', 'success');
@@ -516,6 +414,5 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Iniciar a aplicação
     init();
 });
