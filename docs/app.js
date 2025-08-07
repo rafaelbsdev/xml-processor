@@ -8,9 +8,10 @@ document.addEventListener('DOMContentLoaded', () => {
         fileInput: document.getElementById('fileInput'),
         dropZone: document.getElementById('dropZone'),
         selectFileBtn: document.getElementById('selectFileBtn'),
+        // O id do botão de ZIP foi corrigido no HTML
+        processZipBtn: document.getElementById('processZipBtn'),
         processExcelBtn: document.getElementById('processExcelBtn'),
         processXmlBtn: document.getElementById('processXmlBtn'),
-        processZipBtn: document.getElementById('processZipBtn'),
         clearFileBtn: document.getElementById('clearFileBtn'),
         progressBar: document.getElementById('progressBar'),
         progressText: document.getElementById('progressText'),
@@ -110,8 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.clearFileBtn.disabled = false;
 
         const filename = file.name.toLowerCase();
-
-        // Desabilita todos os botões de processamento por padrão
+        
         UI.processZipBtn.disabled = true;
         UI.processXmlBtn.disabled = true;
         UI.processExcelBtn.disabled = true;
@@ -119,7 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filename.includes('_cli.xml') || filename.includes('_op.xml') || filename.includes('_gar.xml')) {
             UI.processExcelBtn.disabled = false;
         } else if (filename.includes('.xml')) {
-            // Assume que é o XML principal se não for um dos tipos específicos para Excel
             UI.processZipBtn.disabled = false;
             UI.processXmlBtn.disabled = false;
         }
@@ -205,7 +204,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const fullText = await file.text();
             
             if (outputType === 'zip') {
-                // ... (código existente para ZIP)
+                const clientesRegex = /<Cli[\s\S]*?<\/Cli>/g;
+                const operacoesRegex = /<Op[\s\S]*?<\/Op>/g;
+                const garantiasRegex = /<(Venc|ContInstFinRes4966)[\s\S]*?\/>/g;
+            
+                const clientesBlocks = (fullText.match(clientesRegex) || []).map(block => block.trim());
+                const operacoesBlocks = (fullText.match(operacoesRegex) || []).map(block => block.trim());
+                const garantiasBlocks = (fullText.match(garantiasRegex) || []).map(block => block.trim());
+                
+                createZipExport({
+                    clientes: clientesBlocks.join('\n'),
+                    operacoes: operacoesBlocks.join('\n'),
+                    garantias: garantiasBlocks.join('\n')
+                }, file.name);
+                
             } else if (outputType === 'xml_simplificado') {
                 const cliRegex = /<Cli[\s\S]*?<\/Cli>/g;
                 const cliBlocks = (fullText.match(cliRegex) || []);
@@ -213,7 +225,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const simplifiedXmlContent = simplifiedBlocks.join('\n');
                 downloadFile(simplifiedXmlContent, file.name, 'xml');
             } else if (outputType === 'excel') {
-                // Lógica de conversão para Excel (CSV)
                 let csvContent = '';
                 let regex;
                 const filename = file.name.toLowerCase();
@@ -273,9 +284,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             handleProcessingError(error);
         } finally {
-            const filename = file.name.toLowerCase();
+            const filename = AppState.selectedFile.name.toLowerCase();
             UI.clearFileBtn.disabled = false;
-
+            AppState.isProcessing = false;
+            
             UI.processZipBtn.disabled = true;
             UI.processXmlBtn.disabled = true;
             UI.processExcelBtn.disabled = true;
@@ -301,7 +313,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (type === 'csv') {
             newFilename = `${baseName}.csv`;
             blobType = 'text/csv;charset=utf-8;';
-            // Adiciona o BOM para garantir que o Excel reconheça o UTF-8
             content = '\ufeff' + content;
         } else {
             newFilename = `${baseName}.txt`;
