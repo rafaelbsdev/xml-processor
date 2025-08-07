@@ -1,8 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // ---- CONFIGURAÇÃO ----
-    // Altere o nome da tag que deve ser removida no XML simplificado aqui.
-    const TAG_TO_REMOVE = 'Cmp';
-
+    // Constantes de configuração
     const ALLOWED_FILE_TYPES = ['xml', 'txt'];
     const ENCODING = 'utf-8';
 
@@ -48,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.clearLogBtn.addEventListener('click', clearLog);
         
         const dropZone = document.getElementById('dropZone');
-        const dragEvents = ['dragenter', 'dragover', 'dragenter', 'dragleave', 'drop'];
+        const dragEvents = ['dragenter', 'dragover', 'dragleave', 'drop'];
         dragEvents.forEach(eventName => {
             dropZone.addEventListener(eventName, preventDefaults, false);
         });
@@ -200,8 +197,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let currentCliCd = '';
         let currentOpNum = '';
 
-        const startTagToRemove = `<${TAG_TO_REMOVE}`;
-        const endTagToRemove = `</${TAG_TO_REMOVE}>`;
+        // Variáveis para a nova lógica de extração de blocos Cli
+        let inCliBlock = false;
+        let cliBlockBuffer = '';
 
         try {
             while (true) {
@@ -227,8 +225,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             const opWithCliCd = trimmed.replace(/\/?>/, ` CliCd="${currentCliCd}">`);
                             operacoesXml += `${opWithCliCd}\n`;
                         } else if (trimmed.startsWith('<Venc') || trimmed.startsWith('<ContInstFinRes4966')) {
-                            const garWithCliOp = trimmed.replace(/\/?>/, ` CliCd="${currentCliCd}" OpNum="${currentOpNum}">`);
-                            garantiasXml += `${garWithCliOp}\n`;
+                             const garWithCliOp = trimmed.replace(/\/?>/, ` CliCd="${currentCliCd}" OpNum="${currentOpNum}">`);
+                             garantiasXml += `${garWithCliOp}\n`;
                         } else if (trimmed.includes('</Op>')) {
                             operacoesXml += `${trimmed}\n`;
                         } else if (trimmed.includes('</Cli>')) {
@@ -236,8 +234,17 @@ document.addEventListener('DOMContentLoaded', () => {
                             currentCliCd = '';
                         }
                     } else if (outputType === 'xml_simplificado') {
-                        if (!trimmed.startsWith(startTagToRemove) && !trimmed.startsWith(endTagToRemove)) {
-                            simplifiedXml += `${line}\n`;
+                        // Nova lógica para extrair blocos <Cli>
+                        if (trimmed.startsWith('<Cli')) {
+                            inCliBlock = true;
+                            cliBlockBuffer = line;
+                        } else if (trimmed.includes('</Cli>')) {
+                            cliBlockBuffer += `\n${line}`;
+                            simplifiedXml += cliBlockBuffer + '\n';
+                            inCliBlock = false;
+                            cliBlockBuffer = '';
+                        } else if (inCliBlock) {
+                            cliBlockBuffer += `\n${line}`;
                         }
                     }
                 }
@@ -246,6 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 addLog(`Progresso: ${progress}% (${bytesProcessed}/${totalBytes} bytes)`, 'info', true);
             }
 
+            // Lidar com o buffer restante
             if (contentBuffer.length > 0) {
                  if (outputType === 'zip') {
                      const trimmed = contentBuffer.trim();
@@ -258,11 +266,9 @@ document.addEventListener('DOMContentLoaded', () => {
                          const garWithCliOp = trimmed.replace(/\/?>/, ` CliCd="${currentCliCd}" OpNum="${currentOpNum}">`);
                          garantiasXml += `${garWithCliOp}\n`;
                      }
-                 } else if (outputType === 'xml_simplificado') {
-                     const trimmed = contentBuffer.trim();
-                     if (!trimmed.startsWith(startTagToRemove) && !trimmed.startsWith(endTagToRemove)) {
-                         simplifiedXml += `${contentBuffer}\n`;
-                     }
+                 } else if (outputType === 'xml_simplificado' && inCliBlock) {
+                     cliBlockBuffer += `\n${contentBuffer}`;
+                     simplifiedXml += cliBlockBuffer + '\n';
                  }
             }
 
@@ -365,7 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function downloadSampleFile() {
-        const sampleContent = `<?xml version="1.0" encoding="utf-8"?><root><Cli Cd="123" Nom="Cliente A"><Op Num="op1" Vlr="1000"><Venc Cd="v1" Vlr="500"/><Cmp>Conteudo a ser removido</Cmp></Op><Op Num="op2" Vlr="2000"><ContInstFinRes4966 Cd="g1" Vlr="1500"/><Cmp>Outro Conteudo a ser removido</Cmp></Op></Cli><Cli Cd="456" Nom="Cliente B"><Op Num="op3" Vlr="3000"><Venc Cd="v2" Vlr="1000"/></Op></Cli></root>`;
+        const sampleContent = `<?xml version="1.0" encoding="utf-8"?><root><Cli Cd="123" Nom="Cliente A"><Op Num="op1" Vlr="1000"><Venc v320="500"/></Op><Op Num="op2" Vlr="2000"><ContInstFinRes4966 Cd="g1" Vlr="1500"/></Op></Cli><Cli Cd="456" Nom="Cliente B"><Op Num="op3" Vlr="3000"><Venc v330="1000"/></Op></Cli></root>`;
         try {
             const blob = new Blob([sampleContent], { type: 'text/xml' });
             const url = URL.createObjectURL(blob);
