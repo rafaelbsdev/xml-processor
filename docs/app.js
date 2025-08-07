@@ -74,6 +74,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return filename.split('.').pop().toLowerCase();
     }
 
+    function extractAttribute(tag, attributeName) {
+        const regex = new RegExp(`${attributeName}="([^"]*)"`);
+        const match = tag.match(regex);
+        return match ? match[1] : '';
+    }
+
     // Manipulação de arquivos
     function handleFileSelection(e) {
         const files = e.target.files;
@@ -187,6 +193,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let operacoesXml = '';
         let garantiasXml = '';
 
+        let currentCliCd = '';
+        let currentOpNum = '';
+
         try {
             while (true) {
                 const { done, value } = await reader.read();
@@ -203,17 +212,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!trimmed) continue;
                     
                     if (outputType === 'zip') {
-                        // Lógica para separar em 3 XMLs
                         if (trimmed.startsWith('<Cli')) {
+                            currentCliCd = extractAttribute(trimmed, 'Cd');
                             clientesXml += `${trimmed}\n`;
                         } else if (trimmed.startsWith('<Op')) {
-                            operacoesXml += `${trimmed}\n`;
+                            currentOpNum = extractAttribute(trimmed, 'Num');
+                            const opWithCliCd = trimmed.replace('>', ` CliCd="${currentCliCd}">`);
+                            operacoesXml += `${opWithCliCd}\n`;
                         } else if (trimmed.startsWith('<Venc') || trimmed.startsWith('<ContInstFinRes4966')) {
-                            garantiasXml += `${trimmed}\n`;
+                            // Adiciona o Cd do cliente e o Num da operação à tag Gar
+                            const garWithCliOp = trimmed.replace('/>', ` CliCd="${currentCliCd}" OpNum="${currentOpNum}"/>`);
+                            garantiasXml += `${garWithCliOp}\n`;
                         } else if (trimmed.includes('</Op>')) {
                             operacoesXml += `${trimmed}\n`;
                         } else if (trimmed.includes('</Cli>')) {
                             clientesXml += `${trimmed}\n`;
+                            // Reseta os IDs ao sair do bloco do cliente
+                            currentCliCd = '';
                         }
                     } else if (outputType === 'xml') {
                         // Lógica original de simplificação
@@ -231,9 +246,11 @@ document.addEventListener('DOMContentLoaded', () => {
                      if (trimmed.startsWith('<Cli') || trimmed.includes('</Cli>')) {
                          clientesXml += `${trimmed}\n`;
                      } else if (trimmed.startsWith('<Op') || trimmed.includes('</Op>')) {
-                         operacoesXml += `${trimmed}\n`;
+                         const opWithCliCd = trimmed.replace('>', ` CliCd="${currentCliCd}">`);
+                         operacoesXml += `${opWithCliCd}\n`;
                      } else if (trimmed.startsWith('<Venc') || trimmed.startsWith('<ContInstFinRes4966')) {
-                         garantiasXml += `${trimmed}\n`;
+                         const garWithCliOp = trimmed.replace('/>', ` CliCd="${currentCliCd}" OpNum="${currentOpNum}"/>`);
+                         garantiasXml += `${garWithCliOp}\n`;
                      }
                  }
             }
@@ -266,11 +283,8 @@ document.addEventListener('DOMContentLoaded', () => {
             addLog('Criando arquivo ZIP...', 'info');
             const zip = new JSZip();
 
-            // Extrai o nome base do arquivo original, removendo a extensão
-            // Aprimorado para ser mais seguro
             const baseName = originalFilename.split('.').slice(0, -1).join('.');
 
-            // Envolve cada conteúdo XML com uma tag raiz e usa o novo nome
             const clientesContent = `<?xml version="1.0" encoding="utf-8"?><root>${files.clientes}</root>`;
             const operacoesContent = `<?xml version="1.0" encoding="utf-8"?><root>${files.operacoes}</root>`;
             const garantiasContent = `<?xml version="1.0" encoding="utf-8"?><root>${files.garantias}</root>`;
@@ -311,7 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function downloadSampleFile() {
-        const sampleContent = `É o Rafa vida.... Ta achando q vai ser mamão assim? Sobe o XML vc ai pô. Quer tudo mamão? Quer docinho? Ai não dá né?`;
+        const sampleContent = `<?xml version="1.0" encoding="utf-8"?><root><Cli Cd="123" Nom="Cliente A"><Op Num="op1" Vlr="1000"><Venc Cd="v1" Vlr="500"/></Op><Op Num="op2" Vlr="2000"><ContInstFinRes4966 Cd="g1" Vlr="1500"/></Op></Cli><Cli Cd="456" Nom="Cliente B"><Op Num="op3" Vlr="3000"><Venc Cd="v2" Vlr="1000"/></Op></Cli></root>`;
         try {
             const blob = new Blob([sampleContent], { type: 'text/xml' });
             const url = URL.createObjectURL(blob);
