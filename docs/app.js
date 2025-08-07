@@ -267,19 +267,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const zip = new JSZip();
 
             // Extrai o nome base do arquivo original, removendo a extensão
-            const baseName = originalFilename.replace(/\.[^/.]+$/, '');
+            // Aprimorado para ser mais seguro
+            const baseName = originalFilename.split('.').slice(0, -1).join('.');
 
             // Envolve cada conteúdo XML com uma tag raiz e usa o novo nome
-            const clientesContent = `<root>${files.clientes}</root>`;
-            const operacoesContent = `<root>${files.operacoes}</root>`;
-            const garantiasContent = `<root>${files.garantias}</root>`;
+            const clientesContent = `<?xml version="1.0" encoding="utf-8"?><root>${files.clientes}</root>`;
+            const operacoesContent = `<?xml version="1.0" encoding="utf-8"?><root>${files.operacoes}</root>`;
+            const garantiasContent = `<?xml version="1.0" encoding="utf-8"?><root>${files.garantias}</root>`;
 
             zip.file(`${baseName}_CLI.xml`, clientesContent);
             zip.file(`${baseName}_OP.xml`, operacoesContent);
             zip.file(`${baseName}_GAR.xml`, garantiasContent);
 
             zip.generateAsync({ type: 'blob' }).then(content => {
-                const newFilename = originalFilename.replace(/(\.\w+)$/, '.zip');
+                const newFilename = originalFilename.replace(/\.[^/.]+$/, '.zip');
                 const url = URL.createObjectURL(content);
                 const a = document.createElement('a');
                 a.href = url;
