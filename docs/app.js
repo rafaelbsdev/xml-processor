@@ -366,9 +366,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const cliSheet = XLSX.utils.json_to_sheet(cliData);
             const opSheet = XLSX.utils.json_to_sheet(opData);
             const garSheet = XLSX.utils.json_to_sheet(garData);
-            XLSX.utils.book_append_sheet(workbook, cliSheet, 'Cli');
-            XLSX.utils.book_append_sheet(workbook, opSheet, 'Op');
-            XLSX.utils.book_append_sheet(workbook, garSheet, 'Gar');
+            XLSX.utils.book_append_sheet(workbook, cliSheet, 'Clientes');
+            XLSX.utils.book_append_sheet(workbook, opSheet, 'Operacoes');
+            XLSX.utils.book_append_sheet(workbook, garSheet, 'Garantias');
             const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
             const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
             const newFilename = originalFilename.replace(/(\.\w+)$/, '_ALTERADO.xlsx');
