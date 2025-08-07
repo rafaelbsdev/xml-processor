@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
         selectFileBtn: document.getElementById('selectFileBtn'),
         processExcelBtn: document.getElementById('processExcelBtn'),
         processXmlBtn: document.getElementById('processXmlBtn'),
-        downloadSampleBtn: document.getElementById('downloadSampleBtn'),
         clearFileBtn: document.getElementById('clearFileBtn'),
         progressBar: document.getElementById('progressBar'),
         progressText: document.getElementById('progressText'),
@@ -41,7 +40,6 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.processExcelBtn.addEventListener('click', () => processFile('zip'));
         UI.processXmlBtn.addEventListener('click', () => processFile('xml_simplificado'));
         UI.clearFileBtn.addEventListener('click', clearFileSelection);
-        UI.downloadSampleBtn.addEventListener('click', downloadSampleFile);
         UI.clearLogBtn.addEventListener('click', clearLog);
         
         const dropZone = document.getElementById('dropZone');
@@ -259,8 +257,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, file.name);
             } else if (outputType === 'xml_simplificado') {
                 const fullText = await file.text();
+                // Regex para encontrar cada bloco <Cli> completo
                 const cliRegex = /<Cli[\s\S]*?<\/Cli>/g;
-                const simplifiedXmlContent = (fullText.match(cliRegex) || []).join('\n');
+                const cliBlocks = (fullText.match(cliRegex) || []);
+                
+                // Processa cada bloco para remover quebras de linha e espaços
+                const simplifiedBlocks = cliBlocks.map(block => block.replace(/\s+/g, ' ').trim());
+                
+                const simplifiedXmlContent = simplifiedBlocks.join('\n');
                 downloadFile(simplifiedXmlContent, file.name, 'xml');
             }
 
@@ -349,38 +353,6 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.processExcelBtn.disabled = false;
         UI.processXmlBtn.disabled = false;
         AppState.isProcessing = false;
-    }
-
-    function downloadSampleFile() {
-        const sampleContent = `<?xml version="1.0" encoding="utf-8"?>
-<Doc3040 CNPJ="04902979" DtBase="2025-06">
-  <Cli Cd="00116458658" Tp="1">
-    <Op IPOC="0490297902031001164586580000010">
-      <Venc v320="12489.12" />
-      <ContInstFinRes4966 ClasAtFin="1" />
-    </Op>
-  </Cli>
-  <Cli Cd="00444203" Tp="2">
-    <Op DetCli="00444203000177">
-      <Venc v330="124087.65" />
-      <ContInstFinRes4966 ClasAtFin="1" />
-    </Op>
-  </Cli>
-</Doc3040>`;
-        try {
-            const blob = new Blob([sampleContent], { type: 'text/xml' });
-            const url = URL.createObjectURL(blob);
-            const downloadLink = document.createElement('a');
-            downloadLink.href = url;
-            downloadLink.download = 'exemplo_bancario.xml';
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
-            setTimeout(() => URL.revokeObjectURL(url), 100);
-            addLog('Exemplo XML baixado com sucesso!', 'success');
-        } catch (error) {
-            addLog(`Erro ao baixar exemplo: ${error.message}`, 'error');
-        }
     }
 
     init();
