@@ -223,12 +223,13 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Novo array para o Excel único e desnormalizado
         const excelData = [];
-        
         const outputLines = [];
 
         let inCliBlock = false;
         let buffer = [];
         
+        let cliCount = 0; // Contador para limitar a 10 clientes
+
         try {
             while (true) {
                 const { done, value } = await reader.read();
@@ -250,6 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 outputLines.push(buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
                             } else if (outputType === 'excel') {
                                 processExcelBlock(buffer.join(''), excelData);
+                                cliCount++;
                             }
                         }
                         inCliBlock = true;
@@ -261,9 +263,16 @@ document.addEventListener('DOMContentLoaded', () => {
                                 outputLines.push(buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
                             } else if (outputType === 'excel') {
                                 processExcelBlock(buffer.join(''), excelData);
+                                cliCount++;
                             }
                             inCliBlock = false;
                             buffer = [];
+                            
+                            // Parar o processamento após 10 clientes se a saída for Excel
+                            if (outputType === 'excel' && cliCount >= 10) {
+                                addLog('Processamento limitado aos 10 primeiros clientes para o Excel.', 'info');
+                                throw new Error('Limit reached');
+                            }
                         }
                     } else {
                         outputLines.push(line);
@@ -280,6 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
                      outputLines.push(buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
                  } else if (outputType === 'excel') {
                      processExcelBlock(buffer.join(''), excelData);
+                     cliCount++;
                  }
             }
             if (contentBuffer.length > 0 && !inCliBlock) {
@@ -297,7 +307,14 @@ document.addEventListener('DOMContentLoaded', () => {
             updateProgress(100);
 
         } catch (error) {
-            handleProcessingError(error);
+            if (error.message === 'Limit reached') {
+                addLog('Limite de 10 clientes atingido. Gerando o Excel com os dados processados.', 'success');
+                createExcelExport(excelData, AppState.selectedFile.name);
+                addLog(`Registros processados para o Excel: ${excelData.length}`, 'info');
+                updateProgress(100);
+            } else {
+                handleProcessingError(error);
+            }
         } finally {
             UI.dropZone.classList.remove('processing');
             UI.processExcelBtn.disabled = false;
@@ -322,6 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const subTagRegex = /<(Venc|ContInstFinRes4966)[^>]*\/>/g;
                 let subTagMatch;
+                let garProcessed = false;
                 while ((subTagMatch = subTagRegex.exec(opMatch)) !== null) {
                     const garAttributes = extractAttributes(subTagMatch[0]);
                     
@@ -331,6 +349,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         ...garAttributes
                     };
                     excelData.push(row);
+                    garProcessed = true;
+                }
+                
+                // Se não houver garantia, cria uma linha apenas com dados do cliente e op
+                if (!garProcessed) {
+                     const row = {
+                         ...cliAttributes,
+                         ...opAttributes,
+                     };
+                     excelData.push(row);
                 }
             });
         }
