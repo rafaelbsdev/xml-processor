@@ -8,8 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
         fileInput: document.getElementById('fileInput'),
         dropZone: document.getElementById('dropZone'),
         selectFileBtn: document.getElementById('selectFileBtn'),
-        processExcelBtn: document.getElementById('processExcelBtn'), // Mantido para compatibilidade, mas agora desabilitado
-        processCsvBtn: document.getElementById('processCsvBtn'), // Novo botão
+        processExcelBtn: document.getElementById('processExcelBtn'),
+        processCsvBtn: document.getElementById('processCsvBtn'), // Novo botão para CSV
         processXmlBtn: document.getElementById('processXmlBtn'),
         downloadSampleBtn: document.getElementById('downloadSampleBtn'),
         clearFileBtn: document.getElementById('clearFileBtn'),

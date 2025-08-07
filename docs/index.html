@@ -1,82 +1,59 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>É o Rafa! 🐲🐒</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Processador de Arquivos Bancários</title>
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="style.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </head>
 <body>
+
     <div class="container">
-        <header>
-            <h1><i class="fas fa-file-code"></i> Processador de XML/TXT do Rafa p Vcs! 🐲</h1>
-            <p>Transformea seus &lt;MILHÕES&gt; de linhas em menos milhões de linhas.</p>
-        </header>
+        <h1>Processador de Arquivos XML/TXT</h1>
+        <p>Desenvolvido para extrair dados bancários para formatos de planilhas.</p>
+
+        <div id="dropZone" class="drop-zone">
+            <div class="upload-icon">
+                <i class="fas fa-cloud-upload-alt"></i>
+            </div>
+            <div class="upload-message">
+                <p class="main-message">Arraste e solte seu arquivo XML/TXT aqui</p>
+                <p class="secondary-message">ou clique para selecionar</p>
+            </div>
+            <div id="fileInfo" class="file-info">
+                <span id="fileName"></span>
+                <span id="fileSize"></span>
+            </div>
+            <input type="file" id="fileInput" hidden>
+        </div>
+
+        <div class="button-group">
+            <button id="selectFileBtn" class="btn"><i class="fas fa-search"></i> Selecionar Arquivo</button>
+            <button id="processCsvBtn" class="btn primary-btn" disabled><i class="fas fa-file-csv"></i> Gerar CSV</button>
+            <button id="processExcelBtn" class="btn secondary-btn" disabled><i class="fas fa-file-excel"></i> Gerar Excel (Teste)</button>
+            <button id="processXmlBtn" class="btn secondary-btn" disabled><i class="fas fa-code"></i> Gerar XML</button>
+            <button id="clearFileBtn" class="btn danger-btn" disabled><i class="fas fa-times"></i> Limpar</button>
+        </div>
+
+        <div class="progress-container">
+            <div id="progressBar" class="progress-bar"></div>
+            <span id="progressText" class="progress-text">0%</span>
+        </div>
+
+        <div class="log-container">
+            <h3>Log de Eventos</h3>
+            <div id="logContent" class="log-content"></div>
+            <button id="clearLogBtn" class="btn-clear-log"><i class="fas fa-broom"></i> Limpar Log</button>
+        </div>
         
-        <main>
-            <div class="upload-area" id="dropZone">
-                <input type="file" id="fileInput" accept=".xml,.txt">
-                <div class="upload-icon">
-                    <i class="fas fa-cloud-upload-alt"></i>
-                </div>
-                <div class="upload-message">
-                    <p class="main-message">Arraste e solte seu arquivo XML/TXT aqui</p>
-                    <p class="secondary-message">ou</p>
-                    <button id="selectFileBtn">Selecionar Arquivo</button>
-                </div>
-                <div class="file-info" id="fileInfo">
-                    <i class="fas fa-file-alt file-icon"></i>
-                    <div class="file-details">
-                        <span class="file-name" id="fileName">Nenhum arquivo selecionado</span>
-                        <span class="file-size" id="fileSize"></span>
-                    </div>
-                    <button class="clear-file" id="clearFileBtn" title="Remover arquivo">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <div class="actions">
-                <button id="processExcelBtn" disabled>
-                    <i class="fas fa-file-excel"></i> Gerar Excel
-                </button>
-                <button id="processCsvBtn" class="btn" disabled>
-                    <i class="fas fa-file-csv"></i> Gerar CSV
-                </button>
-                <button id="downloadSampleBtn">
-                    <i class="fas fa-download"></i> Baixa o exemplo ai se tiver coragem.
-                </button>
-            </div>
-            
-            <div class="progress-container">
-                <div class="progress-header">
-                    <h2><i class="fas fa-tasks"></i> Progresso</h2>
-                    <span id="progressText">0%</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress" id="progressBar"></div>
-                </div>
-            </div>
-            
-            <div class="log-container">
-                <div class="log-header">
-                    <h2><i class="fas fa-terminal"></i> Log de Execução</h2>
-                    <button id="clearLogBtn"><i class="fas fa-trash"></i> Limpar</button>
-                </div>
-                <div class="log-content" id="logContent">
-                    <div class="log-entry">Pronto para iniciar</div>
-                </div>
-            </div>
-        </main>
-        
-        <footer>
-            <p>Processa XML/TXT E Cospe Ele Bonitin P Vc Ta?</p>
-            <p>Desenvolvido Pelo Rafa Belo 🐲</p>
-        </footer>
     </div>
 
     <script src="app.js"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 </body>
 </html>
