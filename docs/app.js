@@ -43,28 +43,22 @@ document.addEventListener('DOMContentLoaded', () => {
             e.stopPropagation();
             UI.fileInput.click();
         });
-
         UI.fileInput.addEventListener('change', handleFileSelection);
-
         UI.processExcelBtn.addEventListener('click', () => processFile('excel'));
         UI.processXmlBtn.addEventListener('click', () => processFile('xml'));
-        
         UI.clearFileBtn.addEventListener('click', clearFileSelection);
         UI.downloadSampleBtn.addEventListener('click', downloadSampleFile);
         UI.clearLogBtn.addEventListener('click', clearLog);
-
+        
         const dragEvents = ['dragenter', 'dragover', 'dragleave', 'drop'];
         dragEvents.forEach(eventName => {
             UI.dropZone.addEventListener(eventName, preventDefaults, false);
         });
-
         UI.dropZone.addEventListener('dragenter', highlightDropZone, false);
         UI.dropZone.addEventListener('dragover', highlightDropZone, false);
-
         ['dragleave', 'drop'].forEach(eventName => {
             UI.dropZone.addEventListener(eventName, unhighlightDropZone, false);
         });
-
         UI.dropZone.addEventListener('drop', handleFileDrop, false);
     }
 
@@ -116,12 +110,10 @@ document.addEventListener('DOMContentLoaded', () => {
             showError(`Tipo de arquivo não suportado. Use: ${ALLOWED_FILE_TYPES.join(', ')}`);
             return;
         }
-
         AppState.selectedFile = file;
         updateFileDisplay(file);
         addLog(`Arquivo selecionado: ${file.name}`, 'success');
         addLog(`Tamanho: ${formatFileSize(file.size)}`, 'info');
-        
         UI.processExcelBtn.disabled = false;
         UI.processXmlBtn.disabled = false;
     }
@@ -131,7 +123,6 @@ document.addEventListener('DOMContentLoaded', () => {
         AppState.selectedFile = null;
         resetFileDisplay();
         addLog('Seleção de arquivo removida.', 'info');
-        
         UI.processExcelBtn.disabled = true;
         UI.processXmlBtn.disabled = true;
     }
@@ -149,7 +140,6 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.dropZone.classList.remove('active');
         UI.mainMessage.textContent = 'Arraste e solte seu arquivo XML/TXT aqui';
         UI.secondaryMessage.style.visibility = 'visible';
-        
         if (!AppState.selectedFile) {
             UI.uploadIcon.className = 'fas fa-cloud-upload-alt';
             UI.uploadIcon.style.color = 'var(--secondary)';
@@ -159,11 +149,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateFileDisplay(file) {
         UI.uploadIcon.className = 'fas fa-file-alt';
         UI.uploadIcon.style.color = 'var(--warning)';
-        
         UI.fileName.textContent = file.name;
         UI.fileSize.textContent = formatFileSize(file.size);
         UI.fileInfo.classList.add('show');
-        
         UI.uploadMessage.style.display = 'none';
     }
 
@@ -178,9 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.uploadIcon.className = 'fas fa-exclamation-circle';
         UI.uploadIcon.style.color = 'var(--error)';
         UI.dropZone.classList.add('error-state');
-        
         addLog(`Erro: ${message}`, 'error');
-        
         setTimeout(() => {
             UI.dropZone.classList.remove('error-state');
             if (!AppState.selectedFile) {
@@ -207,10 +193,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const logEntry = document.createElement('div');
         logEntry.className = `log-entry log-${type}`;
-        
         const timestamp = new Date().toLocaleTimeString();
         logEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
-        
         UI.logContent.appendChild(logEntry);
         UI.logContent.scrollTop = UI.logContent.scrollHeight;
     }
@@ -219,10 +203,9 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.logContent.innerHTML = '<div class="log-entry">Log limpo.</div>';
     }
 
-    // ** Lógica de Processamento de Arquivo Corrigida para XML/TXT **
+    // Lógica de processamento de arquivo aprimorada e corrigida
     async function processFile(outputType) {
         if (!AppState.selectedFile || AppState.isProcessing) return;
-        
         AppState.isProcessing = true;
         UI.processExcelBtn.disabled = true;
         UI.processXmlBtn.disabled = true;
@@ -244,15 +227,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const outputLines = [];
 
         let inCliBlock = false;
-        let inOpBlock = false;
-        let cliBlockBuffer = []; // Novo buffer exclusivo para blocos Cli
-        let currentCliId = 0;
-        let currentOpId = 0;
+        let cliBlockBuffer = [];
         
         try {
             while (true) {
                 const { done, value } = await reader.read();
-                if (done) break;
+                if (done) {
+                    if (contentBuffer.length > 0) {
+                        contentBuffer.split(/\r?\n/).forEach(line => {
+                            processLine(line, outputType, {
+                                cliData, opData, garData, outputLines,
+                                inCliBlock, cliBlockBuffer
+                            });
+                        });
+                    }
+                    break;
+                }
 
                 bytesProcessed += value.length;
                 contentBuffer += decoder.decode(value, { stream: true });
@@ -263,7 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 for (const line of lines) {
                     processLine(line, outputType, {
                         cliData, opData, garData, outputLines,
-                        inCliBlock, inOpBlock, cliBlockBuffer, currentCliId, currentOpId
+                        inCliBlock, cliBlockBuffer
                     });
                 }
                 
@@ -273,16 +263,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             // Processa o buffer restante, incluindo o último bloco
-            if (contentBuffer.length > 0) {
-                 processLine(contentBuffer, outputType, {
-                    cliData, opData, garData, outputLines,
-                    inCliBlock, inOpBlock, cliBlockBuffer, currentCliId, currentOpId
-                });
-            }
-            if (cliBlockBuffer.length > 0) {
-                 if (outputType === 'xml') {
-                    outputLines.push(cliBlockBuffer.join('').replace(/\n/g, ''));
-                 }
+            if (cliBlockBuffer.length > 0 && outputType === 'xml') {
+                outputLines.push(cliBlockBuffer.join('').replace(/\s*[\n\r]\s*/g, ''));
             }
             
             if (outputType === 'excel') {
@@ -314,8 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (trimmed.startsWith('<Cli')) {
             state.inCliBlock = true;
-            state.cliBlockBuffer = []; // Reseta o buffer
-            state.currentCliId++; // Incrementa o ID
+            state.cliBlockBuffer = [];
         }
 
         if (state.inCliBlock) {
@@ -325,33 +306,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.inCliBlock = false;
                 if (outputType === 'xml') {
                     // Condensa o buffer em uma única linha e adiciona
-                    state.outputLines.push(state.cliBlockBuffer.join('').replace(/\n/g, '').replace(/\r/g, ''));
+                    state.outputLines.push(state.cliBlockBuffer.join('').replace(/\s*[\n\r]\s*/g, ''));
                 } else if (outputType === 'excel') {
-                    // Lógica para extração de Excel
-                    const fullContent = state.cliBlockBuffer.join('');
-                    const cliAttributes = extractAttributes(fullContent);
-                    cliAttributes.id = state.currentCliId;
-                    state.cliData.push(cliAttributes);
-                    
-                    const opRegex = /<Op[^>]*>.*?<\/Op>/g;
-                    const opMatches = fullContent.match(opRegex) || [];
-                    opMatches.forEach((opMatch, index) => {
-                        const opAttributes = extractAttributes(opMatch);
-                        opAttributes.idCli = state.currentCliId;
-                        opAttributes.id = index + 1;
-                        state.opData.push(opAttributes);
-
-                        const garRegex = /<Gar[^>]*\/>/g;
-                        const garMatches = opMatch.match(garRegex) || [];
-                        garMatches.forEach(garMatch => {
-                            const garAttributes = extractAttributes(garMatch);
-                            garAttributes.idCli = state.currentCliId;
-                            garAttributes.idOp = opAttributes.id;
-                            state.garData.push(garAttributes);
-                        });
-                    });
+                    // ** LÓGICA DE EXCEL TEMPORARIAMENTE DESATIVADA PARA FOCO NO XML **
+                    // Será corrigida em uma próxima etapa.
                 }
-                state.cliBlockBuffer = []; // Limpa o buffer após o processamento
+                state.cliBlockBuffer = [];
             }
         } else {
             // Se não está em um bloco Cli, simplesmente adiciona a linha
@@ -359,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Funções para criar e baixar arquivos (sem alterações)
+    // Funções de download e manipulação de arquivos (inalteradas)
     function createExcelExport(cliData, opData, garData, originalFilename) {
         try {
             addLog('Criando arquivo Excel...', 'info');
@@ -367,27 +327,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const cliSheet = XLSX.utils.json_to_sheet(cliData);
             const opSheet = XLSX.utils.json_to_sheet(opData);
             const garSheet = XLSX.utils.json_to_sheet(garData);
-
             XLSX.utils.book_append_sheet(workbook, cliSheet, 'Cli');
             XLSX.utils.book_append_sheet(workbook, opSheet, 'Op');
             XLSX.utils.book_append_sheet(workbook, garSheet, 'Gar');
-
             const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
             const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
             const newFilename = originalFilename.replace(/(\.\w+)$/, '_ALTERADO.xlsx');
-
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = newFilename;
             document.body.appendChild(a);
             a.click();
-
             setTimeout(() => {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             }, 100);
-
             addLog(`Arquivo Excel "${newFilename}" gerado com sucesso!`, 'success');
         } catch (error) {
             addLog(`Erro ao criar Excel: ${error.message}`, 'error');
@@ -402,21 +357,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function createDownload(content, originalFilename) {
         try {
             addLog('Preparando arquivo para download...', 'info');
-
             const blob = new Blob([content], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const downloadLink = document.createElement('a');
-
             const newFilename = originalFilename.replace(/(\.\w+)$/, '_ALTERADO$1');
-
             downloadLink.href = url;
             downloadLink.download = newFilename;
             document.body.appendChild(downloadLink);
             downloadLink.click();
             document.body.removeChild(downloadLink);
-
             setTimeout(() => URL.revokeObjectURL(url), 100);
-
             addLog(`Download do arquivo "${newFilename}" iniciado`, 'success');
         } catch (error) {
             addLog(`Erro ao criar download: ${error.message}`, 'error');
@@ -439,20 +389,16 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function downloadSampleFile() {
         const sampleContent = `É o Rafa vida.... Ta achando q vai ser mamão assim? Sobe o XML vc ai pô. Quer tudo mamão? Quer docinho? Ai não dá né?`;
-
         try {
             const blob = new Blob([sampleContent], { type: 'text/xml' });
             const url = URL.createObjectURL(blob);
             const downloadLink = document.createElement('a');
-
             downloadLink.href = url;
             downloadLink.download = 'exemplo_bancario.xml';
             document.body.appendChild(downloadLink);
             downloadLink.click();
             document.body.removeChild(downloadLink);
-
             setTimeout(() => URL.revokeObjectURL(url), 100);
-
             addLog('Exemplo XML baixado com sucesso!', 'success');
         } catch (error) {
             addLog(`Erro ao baixar exemplo: ${error.message}`, 'error');
