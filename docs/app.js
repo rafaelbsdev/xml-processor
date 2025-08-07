@@ -8,21 +8,13 @@ document.addEventListener('DOMContentLoaded', () => {
         fileInput: document.getElementById('fileInput'),
         dropZone: document.getElementById('dropZone'),
         selectFileBtn: document.getElementById('selectFileBtn'),
-        processExcelBtn: document.getElementById('processExcelBtn'),
-        processCsvBtn: document.getElementById('processCsvBtn'), // Novo botão para CSV
+        processExcelBtn: document.getElementById('processExcelBtn'), // Botão existente será usado para CSV
         processXmlBtn: document.getElementById('processXmlBtn'),
         downloadSampleBtn: document.getElementById('downloadSampleBtn'),
         clearFileBtn: document.getElementById('clearFileBtn'),
         progressBar: document.getElementById('progressBar'),
         progressText: document.getElementById('progressText'),
         logContent: document.getElementById('logContent'),
-        uploadIcon: document.querySelector('.upload-icon i'),
-        fileName: document.getElementById('fileName'),
-        fileSize: document.getElementById('fileSize'),
-        fileInfo: document.getElementById('fileInfo'),
-        uploadMessage: document.querySelector('.upload-message'),
-        mainMessage: document.querySelector('.main-message'),
-        secondaryMessage: document.querySelector('.secondary-message'),
         clearLogBtn: document.getElementById('clearLogBtn'),
     };
 
@@ -45,22 +37,26 @@ document.addEventListener('DOMContentLoaded', () => {
             UI.fileInput.click();
         });
         UI.fileInput.addEventListener('change', handleFileSelection);
-        UI.processCsvBtn.addEventListener('click', () => processFile('csv'));
+        
+        // O botão 'Gerar Excel' agora acionará a lógica de processamento CSV
+        UI.processExcelBtn.addEventListener('click', () => processFile('csv'));
+        
         UI.processXmlBtn.addEventListener('click', () => processFile('xml'));
         UI.clearFileBtn.addEventListener('click', clearFileSelection);
         UI.downloadSampleBtn.addEventListener('click', downloadSampleFile);
         UI.clearLogBtn.addEventListener('click', clearLog);
-
-        const dragEvents = ['dragenter', 'dragover', 'dragover', 'dragleave', 'drop'];
+        
+        const dropZone = document.getElementById('dropZone');
+        const dragEvents = ['dragenter', 'dragover', 'dragleave', 'drop'];
         dragEvents.forEach(eventName => {
-            UI.dropZone.addEventListener(eventName, preventDefaults, false);
+            dropZone.addEventListener(eventName, preventDefaults, false);
         });
-        UI.dropZone.addEventListener('dragenter', highlightDropZone, false);
-        UI.dropZone.addEventListener('dragover', highlightDropZone, false);
+        dropZone.addEventListener('dragenter', () => dropZone.classList.add('highlight'), false);
+        dropZone.addEventListener('dragover', () => dropZone.classList.add('highlight'), false);
         ['dragleave', 'drop'].forEach(eventName => {
-            UI.dropZone.addEventListener(eventName, unhighlightDropZone, false);
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('highlight'), false);
         });
-        UI.dropZone.addEventListener('drop', handleFileDrop, false);
+        dropZone.addEventListener('drop', handleFileDrop, false);
     }
 
     // Funções utilitárias
@@ -94,9 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (value === null || value === undefined) {
             return '';
         }
-        // Remove quebras de linha e escapa aspas
         const sanitized = String(value).replace(/"/g, '""').replace(/\r?\n|\r/g, ' ');
-        // Adiciona aspas se o valor contiver vírgula
         return sanitized.includes(',') ? `"${sanitized}"` : sanitized;
     }
 
@@ -125,9 +119,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateFileDisplay(file);
         addLog(`Arquivo selecionado: ${file.name}`, 'success');
         addLog(`Tamanho: ${formatFileSize(file.size)}`, 'info');
-        UI.processCsvBtn.disabled = false;
+        UI.processExcelBtn.disabled = false;
         UI.processXmlBtn.disabled = false;
-        UI.processExcelBtn.disabled = true; // Desabilitado para evitar erro de memória
+        UI.clearFileBtn.disabled = false;
     }
 
     function clearFileSelection() {
@@ -135,72 +129,47 @@ document.addEventListener('DOMContentLoaded', () => {
         AppState.selectedFile = null;
         resetFileDisplay();
         addLog('Seleção de arquivo removida.', 'info');
-        UI.processCsvBtn.disabled = true;
-        UI.processXmlBtn.disabled = true;
         UI.processExcelBtn.disabled = true;
+        UI.processXmlBtn.disabled = true;
+        UI.clearFileBtn.disabled = true;
     }
 
     // Atualização da UI
-    function highlightDropZone() {
-        UI.dropZone.classList.add('active');
-        UI.mainMessage.textContent = 'Solte o arquivo para carregar';
-        UI.secondaryMessage.style.visibility = 'hidden';
-        UI.uploadIcon.className = 'fas fa-file-upload';
-        UI.uploadIcon.style.color = 'var(--accent)';
-    }
-
-    function unhighlightDropZone() {
-        UI.dropZone.classList.remove('active');
-        UI.mainMessage.textContent = 'Arraste e solte seu arquivo XML/TXT aqui';
-        UI.secondaryMessage.style.visibility = 'visible';
-        if (!AppState.selectedFile) {
-            UI.uploadIcon.className = 'fas fa-cloud-upload-alt';
-            UI.uploadIcon.style.color = 'var(--secondary)';
-        }
-    }
-
     function updateFileDisplay(file) {
-        UI.uploadIcon.className = 'fas fa-file-alt';
-        UI.uploadIcon.style.color = 'var(--warning)';
-        UI.fileName.textContent = file.name;
-        UI.fileSize.textContent = formatFileSize(file.size);
-        UI.fileInfo.classList.add('show');
-        UI.uploadMessage.style.display = 'none';
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('fileSize').textContent = formatFileSize(file.size);
+        document.getElementById('fileInfo').style.display = 'flex';
+        document.querySelector('.upload-message').style.display = 'none';
+        document.querySelector('.upload-icon').style.display = 'none';
+        
     }
 
     function resetFileDisplay() {
-        UI.uploadIcon.className = 'fas fa-cloud-upload-alt';
-        UI.uploadIcon.style.color = 'var(--secondary)';
-        UI.fileInfo.classList.remove('show');
-        UI.uploadMessage.style.display = 'block';
+        document.getElementById('fileName').textContent = 'Nenhum arquivo selecionado';
+        document.getElementById('fileSize').textContent = '';
+        document.getElementById('fileInfo').style.display = 'none';
+        document.querySelector('.upload-message').style.display = 'block';
+        document.querySelector('.upload-icon').style.display = 'flex';
     }
 
     function showError(message) {
-        UI.uploadIcon.className = 'fas fa-exclamation-circle';
-        UI.uploadIcon.style.color = 'var(--error)';
-        UI.dropZone.classList.add('error-state');
         addLog(`Erro: ${message}`, 'error');
-        setTimeout(() => {
-            UI.dropZone.classList.remove('error-state');
-            if (!AppState.selectedFile) {
-                resetFileDisplay();
-            }
-        }, 2000);
     }
 
     function updateProgress(percent) {
-        UI.progressBar.style.width = `${percent}%`;
-        UI.progressText.textContent = `${percent}%`;
+        document.getElementById('progressBar').style.width = `${percent}%`;
+        document.getElementById('progressText').textContent = `${percent}%`;
     }
 
     function addLog(message, type = 'info', replaceLast = false) {
+        const logContent = document.getElementById('logContent');
         if (replaceLast) {
-            const lastEntry = UI.logContent.lastChild;
+            const lastEntry = logContent.lastChild;
             if (lastEntry) {
                 const timestamp = new Date().toLocaleTimeString();
                 lastEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
                 lastEntry.className = `log-entry log-${type}`;
-                UI.logContent.scrollTop = UI.logContent.scrollHeight;
+                logContent.scrollTop = logContent.scrollHeight;
                 return;
             }
         }
@@ -208,21 +177,21 @@ document.addEventListener('DOMContentLoaded', () => {
         logEntry.className = `log-entry log-${type}`;
         const timestamp = new Date().toLocaleTimeString();
         logEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
-        UI.logContent.appendChild(logEntry);
-        UI.logContent.scrollTop = UI.logContent.scrollHeight;
+        logContent.appendChild(logEntry);
+        logContent.scrollTop = logContent.scrollHeight;
     }
 
     function clearLog() {
-        UI.logContent.innerHTML = '<div class="log-entry">Log limpo.</div>';
+        document.getElementById('logContent').innerHTML = '<div class="log-entry">Log limpo.</div>';
     }
 
     // Lógica de processamento para CSV
     async function processFile(outputType) {
         if (!AppState.selectedFile || AppState.isProcessing) return;
         AppState.isProcessing = true;
-        UI.processCsvBtn.disabled = true;
+        UI.processExcelBtn.disabled = true;
         UI.processXmlBtn.disabled = true;
-        UI.dropZone.classList.add('processing');
+        
         addLog(`Iniciando processamento para ${outputType}...`, 'info');
         updateProgress(0);
 
@@ -235,8 +204,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalBytes = file.size;
         
         let outputContent = '';
-        const csvHeader = 'cli_Cd,cli_Nom,op_Num,op_Vlr,gar_Cd,gar_Vlr\n';
-        outputContent += csvHeader;
+        // Cabeçalho completo do CSV, unindo todos os atributos das tags <Cli>, <Op> e <Gar>
+        const csvHeader = 'cli_Cd,cli_Nom,op_Num,op_Vlr,gar_Cd,gar_Vlr,gar_ClasAtFin,gar_CartProvMin,gar_EstInstFin,gar_VlrContBr,gar_TJE,gar_v330,gar_v320\n';
+        if (outputType === 'csv') {
+            outputContent += csvHeader;
+        }
 
         let inCliBlock = false;
         let buffer = [];
@@ -260,6 +232,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (inCliBlock) {
                             if (outputType === 'csv') {
                                 outputContent += processCsvBlock(buffer.join(''));
+                            } else {
+                                outputContent += buffer.join('\n');
                             }
                         }
                         inCliBlock = true;
@@ -269,11 +243,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (trimmed.endsWith('</Cli>')) {
                             if (outputType === 'csv') {
                                 outputContent += processCsvBlock(buffer.join(''));
+                            } else {
+                                outputContent += buffer.join('\n');
                             }
                             inCliBlock = false;
                             buffer = [];
                         }
-                    } else if (outputType !== 'csv') {
+                    } else if (outputType === 'xml') {
                         outputContent += line + '\n';
                     }
                 }
@@ -286,15 +262,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (inCliBlock && buffer.length > 0) {
                  if (outputType === 'csv') {
                      outputContent += processCsvBlock(buffer.join(''));
+                 } else {
+                     outputContent += buffer.join('\n');
                  }
             }
-            if (contentBuffer.length > 0 && outputType !== 'csv') {
+            if (contentBuffer.length > 0 && outputType === 'xml') {
                  outputContent += contentBuffer + '\n';
             }
 
             if (outputType === 'csv') {
                 createCsvExport(outputContent, AppState.selectedFile.name);
-            } else {
+            } else if (outputType === 'xml') {
                 createDownload(outputContent, AppState.selectedFile.name);
             }
 
@@ -304,8 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             handleProcessingError(error);
         } finally {
-            UI.dropZone.classList.remove('processing');
-            UI.processCsvBtn.disabled = false;
+            UI.processExcelBtn.disabled = false;
             UI.processXmlBtn.disabled = false;
             AppState.isProcessing = false;
         }
@@ -328,7 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 csvLines += [
                     sanitizeForCsv(cliCd),
                     sanitizeForCsv(cliNom),
-                    '', '', '', ''
+                    '', '', '', '', '', '', '', '', '', '', ''
                 ].join(',') + '\n';
             } else {
                 opMatches.forEach((opMatch) => {
@@ -347,13 +324,20 @@ document.addEventListener('DOMContentLoaded', () => {
                             sanitizeForCsv(cliNom),
                             sanitizeForCsv(opNum),
                             sanitizeForCsv(opVlr),
-                            '', ''
+                            '', '', '', '', '', '', '', '', ''
                         ].join(',') + '\n';
                     } else {
                          garMatches.forEach((garMatch) => {
                             const garAttributes = extractAttributes(garMatch);
                             const garCd = garAttributes.Cd || '';
                             const garVlr = garAttributes.Vlr || '';
+                            const garClasAtFin = garAttributes.ClasAtFin || '';
+                            const garCartProvMin = garAttributes.CartProvMin || '';
+                            const garEstInstFin = garAttributes.EstInstFin || '';
+                            const garVlrContBr = garAttributes.VlrContBr || '';
+                            const garTJE = garAttributes.TJE || '';
+                            const garv330 = garAttributes.v330 || '';
+                            const garv320 = garAttributes.v320 || '';
 
                             // Cria uma linha completa para cada garantia
                             csvLines += [
@@ -362,7 +346,14 @@ document.addEventListener('DOMContentLoaded', () => {
                                 sanitizeForCsv(opNum),
                                 sanitizeForCsv(opVlr),
                                 sanitizeForCsv(garCd),
-                                sanitizeForCsv(garVlr)
+                                sanitizeForCsv(garVlr),
+                                sanitizeForCsv(garClasAtFin),
+                                sanitizeForCsv(garCartProvMin),
+                                sanitizeForCsv(garEstInstFin),
+                                sanitizeForCsv(garVlrContBr),
+                                sanitizeForCsv(garTJE),
+                                sanitizeForCsv(garv330),
+                                sanitizeForCsv(garv320)
                             ].join(',') + '\n';
                         });
                     }
@@ -392,8 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             addLog(`Erro ao criar CSV: ${error.message}`, 'error');
         } finally {
-            UI.dropZone.classList.remove('processing');
-            UI.processCsvBtn.disabled = false;
+            UI.processExcelBtn.disabled = false;
             UI.processXmlBtn.disabled = false;
             AppState.isProcessing = false;
         }
@@ -416,8 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             addLog(`Erro ao criar download: ${error.message}`, 'error');
         } finally {
-            UI.dropZone.classList.remove('processing');
-            UI.processCsvBtn.disabled = false;
+            UI.processExcelBtn.disabled = false;
             UI.processXmlBtn.disabled = false;
             AppState.isProcessing = false;
         }
@@ -426,8 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleProcessingError(error) {
         addLog(`Erro durante o processamento: ${error.message}`, 'error');
         updateProgress(0);
-        UI.dropZone.classList.remove('processing');
-        UI.processCsvBtn.disabled = false;
+        UI.processExcelBtn.disabled = false;
         UI.processXmlBtn.disabled = false;
         AppState.isProcessing = false;
     }
