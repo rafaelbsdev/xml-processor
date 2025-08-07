@@ -122,7 +122,6 @@ document.addEventListener('DOMContentLoaded', () => {
         addLog(`Arquivo selecionado: ${file.name}`, 'success');
         addLog(`Tamanho: ${formatFileSize(file.size)}`, 'info');
         
-        // Ativa os botões de processamento
         UI.processExcelBtn.disabled = false;
         UI.processXmlBtn.disabled = false;
     }
@@ -133,7 +132,6 @@ document.addEventListener('DOMContentLoaded', () => {
         resetFileDisplay();
         addLog('Seleção de arquivo removida.', 'info');
         
-        // Desativa os botões de processamento
         UI.processExcelBtn.disabled = true;
         UI.processXmlBtn.disabled = true;
     }
@@ -221,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.logContent.innerHTML = '<div class="log-entry">Log limpo.</div>';
     }
 
-    // Processamento do arquivo com Streaming para evitar "Out of Memory"
+    // ** Lógica de Processamento de Arquivo Otimizada **
     async function processFile(outputType) {
         if (!AppState.selectedFile || AppState.isProcessing) return;
         
@@ -235,139 +233,65 @@ document.addEventListener('DOMContentLoaded', () => {
         const file = AppState.selectedFile;
         const reader = file.stream().getReader();
         const decoder = new TextDecoder(ENCODING);
-        let contentBuffer = '';
-        let linesProcessed = 0;
-        const totalLines = file.size;
         
+        let contentBuffer = '';
+        let bytesProcessed = 0;
+        const totalBytes = file.size;
+        
+        // Estruturas de dados para o processamento
         const cliData = [];
         const opData = [];
         const garData = [];
+        let outputLines = [];
 
+        // Variáveis de controle de estado
         let inCliBlock = false;
         let inOpBlock = false;
         let buffer = [];
-        let outputLines = [];
-
         let currentCliId = 0;
         let currentOpId = 0;
-
+        
         try {
             while (true) {
                 const { done, value } = await reader.read();
-                if (done) break;
+                if (done) {
+                    // Processar o buffer restante no final do arquivo
+                    if (contentBuffer.length > 0) {
+                        contentBuffer.split(/\r?\n/).forEach(line => {
+                            processLine(line, outputType, {
+                                cliData, opData, garData, outputLines,
+                                inCliBlock, inOpBlock, buffer, currentCliId, currentOpId
+                            });
+                        });
+                    }
+                    break;
+                }
 
+                bytesProcessed += value.length;
                 contentBuffer += decoder.decode(value, { stream: true });
-                const lines = contentBuffer.split(/\r?\n/);
-
-                contentBuffer = lines.pop();
-
+                
+                // Dividir o buffer em linhas completas
+                let lines = contentBuffer.split(/\r?\n/);
+                contentBuffer = lines.pop(); // Armazena a última linha incompleta
+                
                 for (const line of lines) {
-                    const trimmed = line.trim();
-                    linesProcessed += line.length + 1;
-                    
-                    const progress = Math.round((linesProcessed / totalLines) * 100);
-                    updateProgress(progress);
-                    addLog(`Progresso: ${progress}% (${linesProcessed}/${totalLines} bytes)`, 'info', true);
-                    
-                    if (!trimmed) continue;
-                    
-                    if (outputType === 'excel') {
-                        if (trimmed.startsWith('<Cli') || trimmed.includes('<Cli')) {
-                            inCliBlock = true;
-                            currentCliId++;
-                            buffer = [trimmed];
-                            continue;
-                        }
-                        
-                        if (inCliBlock && (trimmed.startsWith('<Op') || trimmed.includes('<Op'))) {
-                            inOpBlock = true;
-                            currentOpId++;
-                            buffer.push(trimmed);
-                            continue;
-                        }
-                        
-                        if (inOpBlock && (trimmed.startsWith('<Gar') || trimmed.includes('<Gar'))) {
-                            const garAttributes = extractAttributes(trimmed);
-                            garAttributes.idCli = currentCliId;
-                            garAttributes.idOp = currentOpId;
-                            garData.push(garAttributes);
-                            buffer.push(trimmed);
-                            continue;
-                        }
-                        
-                        if (inOpBlock && (trimmed.endsWith('/>') || trimmed.includes('</Op>'))) {
-                            inOpBlock = false;
-                            buffer.push(trimmed);
-                            const opContent = buffer.join('');
-                            const opAttributes = extractAttributes(opContent);
-                            opAttributes.idCli = currentCliId;
-                            opData.push(opAttributes);
-                            buffer = [];
-                            continue;
-                        }
-                        
-                        if (inCliBlock && (trimmed.endsWith('/>') || trimmed.includes('</Cli>'))) {
-                            inCliBlock = false;
-                            buffer.push(trimmed);
-                            const cliContent = buffer.join('');
-                            const cliAttributes = extractAttributes(cliContent);
-                            cliAttributes.id = currentCliId;
-                            cliData.push(cliAttributes);
-                            buffer = [];
-                            continue;
-                        }
-                        
-                        if (inCliBlock || inOpBlock) {
-                            buffer.push(trimmed);
-                        }
-
-                    } else if (outputType === 'xml') {
-                        if (trimmed.startsWith('<Cli') || trimmed.includes('<Cli')) {
-                            inCliBlock = true;
-                        }
-                        
-                        if (inCliBlock) {
-                            buffer.push(trimmed);
-                            
-                            if (trimmed.endsWith('</Cli>') || trimmed.includes('</Cli>')) {
-                                inCliBlock = false;
-                                outputLines.push(buffer.join(''));
-                                buffer = [];
-                            }
-                        } else {
-                            outputLines.push(trimmed);
-                        }
-                    }
+                    processLine(line, outputType, {
+                        cliData, opData, garData, outputLines,
+                        inCliBlock, inOpBlock, buffer, currentCliId, currentOpId
+                    });
                 }
-            }
-
-            if (contentBuffer.length > 0) {
-                if (outputType === 'excel') {
-                    if (inOpBlock) {
-                        buffer.push(contentBuffer.trim());
-                        const opContent = buffer.join('');
-                        const opAttributes = extractAttributes(opContent);
-                        opAttributes.idCli = currentCliId;
-                        opData.push(opAttributes);
-                    } else if (inCliBlock) {
-                        buffer.push(contentBuffer.trim());
-                        const cliContent = buffer.join('');
-                        const cliAttributes = extractAttributes(cliContent);
-                        cliAttributes.id = currentCliId;
-                        cliData.push(cliAttributes);
-                    }
-                } else if (outputType === 'xml') {
-                    if (inCliBlock) {
-                        buffer.push(contentBuffer.trim());
-                        outputLines.push(buffer.join(''));
-                    } else {
-                        outputLines.push(contentBuffer.trim());
-                    }
-                }
+                
+                const progress = Math.round((bytesProcessed / totalBytes) * 100);
+                updateProgress(progress);
+                addLog(`Progresso: ${progress}% (${bytesProcessed}/${totalBytes} bytes)`, 'info', true);
             }
             
+            // Lógica final após o loop
             if (outputType === 'excel') {
                 createExcelExport(cliData, opData, garData, AppState.selectedFile.name);
+                addLog(`Clientes (Cli) processados: ${cliData.length}`, 'info');
+                addLog(`Operações (Op) processadas: ${opData.length}`, 'info');
+                addLog(`Garantias (Gar) processadas: ${garData.length}`, 'info');
             } else if (outputType === 'xml') {
                 createDownload(outputLines.join('\n'), AppState.selectedFile.name);
             }
@@ -385,7 +309,64 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Função para criar o arquivo Excel
+    // Função auxiliar para processar cada linha
+    function processLine(line, outputType, state) {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        if (outputType === 'excel') {
+            if (trimmed.startsWith('<Cli')) {
+                state.inCliBlock = true;
+                state.currentCliId++;
+                state.buffer = [trimmed];
+            } else if (state.inCliBlock && trimmed.startsWith('<Op')) {
+                state.inOpBlock = true;
+                state.currentOpId++;
+                state.buffer.push(trimmed);
+            } else if (state.inOpBlock && trimmed.startsWith('<Gar')) {
+                const garAttributes = extractAttributes(trimmed);
+                garAttributes.idCli = state.currentCliId;
+                garAttributes.idOp = state.currentOpId;
+                state.garData.push(garAttributes);
+                state.buffer.push(trimmed);
+            } else if (state.inOpBlock && (trimmed.endsWith('/>') || trimmed.endsWith('</Op>'))) {
+                state.inOpBlock = false;
+                state.buffer.push(trimmed);
+                const opContent = state.buffer.join('');
+                const opAttributes = extractAttributes(opContent);
+                opAttributes.idCli = state.currentCliId;
+                state.opData.push(opAttributes);
+                state.buffer = [];
+            } else if (state.inCliBlock && (trimmed.endsWith('/>') || trimmed.endsWith('</Cli>'))) {
+                state.inCliBlock = false;
+                state.buffer.push(trimmed);
+                const cliContent = state.buffer.join('');
+                const cliAttributes = extractAttributes(cliContent);
+                cliAttributes.id = state.currentCliId;
+                state.cliData.push(cliAttributes);
+                state.buffer = [];
+            } else if (state.inCliBlock || state.inOpBlock) {
+                state.buffer.push(trimmed);
+            }
+        } else if (outputType === 'xml') {
+            if (trimmed.startsWith('<Cli')) {
+                state.inCliBlock = true;
+            }
+            
+            if (state.inCliBlock) {
+                state.buffer.push(trimmed);
+                if (trimmed.endsWith('</Cli>')) {
+                    state.inCliBlock = false;
+                    state.outputLines.push(state.buffer.join(''));
+                    state.buffer = [];
+                }
+            } else {
+                state.outputLines.push(trimmed);
+            }
+        }
+    }
+
+    // Função para criar o arquivo Excel (inalterada)
     function createExcelExport(cliData, opData, garData, originalFilename) {
         try {
             addLog('Criando arquivo Excel...', 'info');
@@ -425,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Função para criar o download do XML
+    // Função para criar o download do XML (inalterada)
     function createDownload(content, originalFilename) {
         try {
             addLog('Preparando arquivo para download...', 'info');
@@ -464,7 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
         AppState.isProcessing = false;
     }
 
-    // Exemplo de arquivo
+    // Exemplo de arquivo (inalterada)
     function downloadSampleFile() {
         const sampleContent = `É o Rafa vida.... Ta achando q vai ser mamão assim? Sobe o XML vc ai pô. Quer tudo mamão? Quer docinho? Ai não dá né?`;
         
