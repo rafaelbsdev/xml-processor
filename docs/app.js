@@ -217,17 +217,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             clientesXml += `${trimmed}\n`;
                         } else if (trimmed.startsWith('<Op')) {
                             currentOpNum = extractAttribute(trimmed, 'Num');
-                            const opWithCliCd = trimmed.replace('>', ` CliCd="${currentCliCd}">`);
+                            const opWithCliCd = trimmed.replace(/\/?>/, ` CliCd="${currentCliCd}">`);
                             operacoesXml += `${opWithCliCd}\n`;
                         } else if (trimmed.startsWith('<Venc') || trimmed.startsWith('<ContInstFinRes4966')) {
-                            // Adiciona o Cd do cliente e o Num da operação à tag Gar
-                            const garWithCliOp = trimmed.replace('/>', ` CliCd="${currentCliCd}" OpNum="${currentOpNum}"/>`);
+                            const garWithCliOp = trimmed.replace(/\/?>/, ` CliCd="${currentCliCd}" OpNum="${currentOpNum}">`);
                             garantiasXml += `${garWithCliOp}\n`;
                         } else if (trimmed.includes('</Op>')) {
                             operacoesXml += `${trimmed}\n`;
                         } else if (trimmed.includes('</Cli>')) {
                             clientesXml += `${trimmed}\n`;
-                            // Reseta os IDs ao sair do bloco do cliente
                             currentCliCd = '';
                         }
                     } else if (outputType === 'xml') {
@@ -239,17 +237,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 addLog(`Progresso: ${progress}% (${bytesProcessed}/${totalBytes} bytes)`, 'info', true);
             }
 
-            // Adicionar o restante do buffer
             if (contentBuffer.length > 0) {
                  if (outputType === 'zip') {
                      const trimmed = contentBuffer.trim();
                      if (trimmed.startsWith('<Cli') || trimmed.includes('</Cli>')) {
                          clientesXml += `${trimmed}\n`;
                      } else if (trimmed.startsWith('<Op') || trimmed.includes('</Op>')) {
-                         const opWithCliCd = trimmed.replace('>', ` CliCd="${currentCliCd}">`);
+                         const opWithCliCd = trimmed.replace(/\/?>/, ` CliCd="${currentCliCd}">`);
                          operacoesXml += `${opWithCliCd}\n`;
                      } else if (trimmed.startsWith('<Venc') || trimmed.startsWith('<ContInstFinRes4966')) {
-                         const garWithCliOp = trimmed.replace('/>', ` CliCd="${currentCliCd}" OpNum="${currentOpNum}"/>`);
+                         const garWithCliOp = trimmed.replace(/\/?>/, ` CliCd="${currentCliCd}" OpNum="${currentOpNum}">`);
                          garantiasXml += `${garWithCliOp}\n`;
                      }
                  }
