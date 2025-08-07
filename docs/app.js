@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.fileInput.addEventListener('change', handleFileSelection);
         
         UI.processExcelBtn.addEventListener('click', () => processFile('zip'));
-        UI.processXmlBtn.addEventListener('click', () => processFile('xml'));
+        UI.processXmlBtn.addEventListener('click', () => processFile('xml_simplificado'));
         UI.clearFileBtn.addEventListener('click', clearFileSelection);
         UI.downloadSampleBtn.addEventListener('click', downloadSampleFile);
         UI.clearLogBtn.addEventListener('click', clearLog);
@@ -192,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let clientesXml = '';
         let operacoesXml = '';
         let garantiasXml = '';
+        let simplifiedXml = '';
 
         let currentCliCd = '';
         let currentOpNum = '';
@@ -228,8 +229,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             clientesXml += `${trimmed}\n`;
                             currentCliCd = '';
                         }
-                    } else if (outputType === 'xml') {
-                        // Lógica original de simplificação
+                    } else if (outputType === 'xml_simplificado') {
+                        // Lógica para simplificar o XML (removendo tags <Cmp>)
+                        if (!trimmed.startsWith('<Cmp') && !trimmed.startsWith('</Cmp>')) {
+                            simplifiedXml += `${line}\n`;
+                        }
                     }
                 }
                 const progress = Math.round((bytesProcessed / totalBytes) * 100);
@@ -249,6 +253,11 @@ document.addEventListener('DOMContentLoaded', () => {
                          const garWithCliOp = trimmed.replace(/\/?>/, ` CliCd="${currentCliCd}" OpNum="${currentOpNum}">`);
                          garantiasXml += `${garWithCliOp}\n`;
                      }
+                 } else if (outputType === 'xml_simplificado') {
+                     const trimmed = contentBuffer.trim();
+                     if (!trimmed.startsWith('<Cmp') && !trimmed.startsWith('</Cmp>')) {
+                         simplifiedXml += `${contentBuffer}\n`;
+                     }
                  }
             }
 
@@ -258,8 +267,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     operacoes: operacoesXml,
                     garantias: garantiasXml
                 }, file.name);
-            } else if (outputType === 'xml') {
-                // Lógica de download do XML simplificado
+            } else if (outputType === 'xml_simplificado') {
+                downloadFile(simplifiedXml, file.name, 'xml');
             }
 
             addLog(`Processamento para ${outputType} concluído!`, 'success');
@@ -275,6 +284,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // Funções de download e manipulação de arquivos
+    function downloadFile(content, originalFilename, type) {
+        const baseName = originalFilename.split('.').slice(0, -1).join('.');
+        let newFilename;
+        let blobType;
+
+        if (type === 'xml') {
+            newFilename = `${baseName}_SIMPLIFICADO.xml`;
+            blobType = 'application/xml';
+        } else {
+            newFilename = `${baseName}.txt`;
+            blobType = 'text/plain';
+        }
+        
+        const blob = new Blob([content], { type: blobType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = newFilename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 100);
+        addLog(`Arquivo "${newFilename}" gerado com sucesso!`, 'success');
+    }
+
     function createZipExport(files, originalFilename) {
         try {
             addLog('Criando arquivo ZIP...', 'info');
@@ -322,7 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function downloadSampleFile() {
-        const sampleContent = `<?xml version="1.0" encoding="utf-8"?><root><Cli Cd="123" Nom="Cliente A"><Op Num="op1" Vlr="1000"><Venc Cd="v1" Vlr="500"/></Op><Op Num="op2" Vlr="2000"><ContInstFinRes4966 Cd="g1" Vlr="1500"/></Op></Cli><Cli Cd="456" Nom="Cliente B"><Op Num="op3" Vlr="3000"><Venc Cd="v2" Vlr="1000"/></Op></Cli></root>`;
+        const sampleContent = `<?xml version="1.0" encoding="utf-8"?><root><Cli Cd="123" Nom="Cliente A"><Op Num="op1" Vlr="1000"><Venc Cd="v1" Vlr="500"/><Cmp>Conteudo a ser removido</Cmp></Op><Op Num="op2" Vlr="2000"><ContInstFinRes4966 Cd="g1" Vlr="1500"/><Cmp>Outro Conteudo a ser removido</Cmp></Op></Cli><Cli Cd="456" Nom="Cliente B"><Op Num="op3" Vlr="3000"><Venc Cd="v2" Vlr="1000"/></Op></Cli></root>`;
         try {
             const blob = new Blob([sampleContent], { type: 'text/xml' });
             const url = URL.createObjectURL(blob);
