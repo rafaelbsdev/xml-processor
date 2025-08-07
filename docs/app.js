@@ -43,12 +43,9 @@ document.addEventListener('DOMContentLoaded', () => {
             e.stopPropagation();
             UI.fileInput.click();
         });
-
         UI.fileInput.addEventListener('change', handleFileSelection);
-
         UI.processExcelBtn.addEventListener('click', () => processFile('excel'));
         UI.processXmlBtn.addEventListener('click', () => processFile('xml'));
-        
         UI.clearFileBtn.addEventListener('click', clearFileSelection);
         UI.downloadSampleBtn.addEventListener('click', downloadSampleFile);
         UI.clearLogBtn.addEventListener('click', clearLog);
@@ -57,14 +54,11 @@ document.addEventListener('DOMContentLoaded', () => {
         dragEvents.forEach(eventName => {
             UI.dropZone.addEventListener(eventName, preventDefaults, false);
         });
-
         UI.dropZone.addEventListener('dragenter', highlightDropZone, false);
         UI.dropZone.addEventListener('dragover', highlightDropZone, false);
-
         ['dragleave', 'drop'].forEach(eventName => {
             UI.dropZone.addEventListener(eventName, unhighlightDropZone, false);
         });
-
         UI.dropZone.addEventListener('drop', handleFileDrop, false);
     }
 
@@ -116,12 +110,10 @@ document.addEventListener('DOMContentLoaded', () => {
             showError(`Tipo de arquivo não suportado. Use: ${ALLOWED_FILE_TYPES.join(', ')}`);
             return;
         }
-
         AppState.selectedFile = file;
         updateFileDisplay(file);
         addLog(`Arquivo selecionado: ${file.name}`, 'success');
         addLog(`Tamanho: ${formatFileSize(file.size)}`, 'info');
-        
         UI.processExcelBtn.disabled = false;
         UI.processXmlBtn.disabled = false;
     }
@@ -131,7 +123,6 @@ document.addEventListener('DOMContentLoaded', () => {
         AppState.selectedFile = null;
         resetFileDisplay();
         addLog('Seleção de arquivo removida.', 'info');
-        
         UI.processExcelBtn.disabled = true;
         UI.processXmlBtn.disabled = true;
     }
@@ -149,7 +140,6 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.dropZone.classList.remove('active');
         UI.mainMessage.textContent = 'Arraste e solte seu arquivo XML/TXT aqui';
         UI.secondaryMessage.style.visibility = 'visible';
-        
         if (!AppState.selectedFile) {
             UI.uploadIcon.className = 'fas fa-cloud-upload-alt';
             UI.uploadIcon.style.color = 'var(--secondary)';
@@ -159,11 +149,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateFileDisplay(file) {
         UI.uploadIcon.className = 'fas fa-file-alt';
         UI.uploadIcon.style.color = 'var(--warning)';
-        
         UI.fileName.textContent = file.name;
         UI.fileSize.textContent = formatFileSize(file.size);
         UI.fileInfo.classList.add('show');
-        
         UI.uploadMessage.style.display = 'none';
     }
 
@@ -178,9 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.uploadIcon.className = 'fas fa-exclamation-circle';
         UI.uploadIcon.style.color = 'var(--error)';
         UI.dropZone.classList.add('error-state');
-        
         addLog(`Erro: ${message}`, 'error');
-        
         setTimeout(() => {
             UI.dropZone.classList.remove('error-state');
             if (!AppState.selectedFile) {
@@ -207,10 +193,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const logEntry = document.createElement('div');
         logEntry.className = `log-entry log-${type}`;
-        
         const timestamp = new Date().toLocaleTimeString();
         logEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
-        
         UI.logContent.appendChild(logEntry);
         UI.logContent.scrollTop = UI.logContent.scrollHeight;
     }
@@ -219,25 +203,24 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.logContent.innerHTML = '<div class="log-entry">Log limpo.</div>';
     }
 
-    // ** Lógica de Processamento Restaurada e Corrigida **
+    // Lógica de processamento de arquivo aprimorada e corrigida
     async function processFile(outputType) {
         if (!AppState.selectedFile || AppState.isProcessing) return;
-        
         AppState.isProcessing = true;
         UI.processExcelBtn.disabled = true;
         UI.processXmlBtn.disabled = true;
         UI.dropZone.classList.add('processing');
         addLog(`Iniciando processamento para ${outputType}...`, 'info');
         updateProgress(0);
-        
+
         const file = AppState.selectedFile;
         const reader = file.stream().getReader();
         const decoder = new TextDecoder(ENCODING);
-        
+
         let contentBuffer = '';
         let bytesProcessed = 0;
         const totalBytes = file.size;
-        
+
         const cliData = [];
         const opData = [];
         const garData = [];
@@ -246,86 +229,45 @@ document.addEventListener('DOMContentLoaded', () => {
         let inCliBlock = false;
         let inOpBlock = false;
         let buffer = [];
-        
+
         let currentCliId = 0;
         let currentOpId = 0;
-        
+
         try {
             while (true) {
                 const { done, value } = await reader.read();
-                if (done) break;
+                if (done) {
+                    if (contentBuffer.length > 0) {
+                        contentBuffer.split(/\r?\n/).forEach(line => {
+                            processLine(line, outputType, {
+                                cliData, opData, garData, outputLines,
+                                inCliBlock, inOpBlock, buffer, currentCliId, currentOpId
+                            });
+                        });
+                    }
+                    break;
+                }
 
                 bytesProcessed += value.length;
                 contentBuffer += decoder.decode(value, { stream: true });
-                
+
                 let lines = contentBuffer.split(/\r?\n/);
                 contentBuffer = lines.pop();
-                
+
                 for (const line of lines) {
-                    const trimmed = line.trim();
-                    if (!trimmed) continue;
-                    
-                    if (trimmed.startsWith('<Cli')) {
-                        if (outputType === 'xml' && buffer.length > 0) {
-                            outputLines.push(buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
-                        }
-                        
-                        inCliBlock = true;
-                        inOpBlock = false;
-                        currentCliId++;
-                        currentOpId = 0;
-                        buffer = [trimmed];
-                        continue;
-                    }
-                    
-                    if (inCliBlock && trimmed.endsWith('</Cli>')) {
-                        inCliBlock = false;
-                        buffer.push(trimmed);
-                        
-                        if (outputType === 'excel') {
-                             const cliContent = buffer.join('');
-                             const cliAttributes = extractAttributes(cliContent);
-                             cliAttributes.id = currentCliId;
-                             cliData.push(cliAttributes);
-                        } else if (outputType === 'xml') {
-                             outputLines.push(buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
-                        }
-                        buffer = [];
-                        continue;
-                    }
-                    
-                    if (inCliBlock) {
-                        buffer.push(trimmed);
-                        
-                        if (outputType === 'excel') {
-                            if (trimmed.startsWith('<Op')) {
-                                inOpBlock = true;
-                                currentOpId++;
-                            } else if (inOpBlock && trimmed.endsWith('</Op>')) {
-                                inOpBlock = false;
-                                const opContent = buffer.slice(buffer.lastIndexOf('<Op')).join('');
-                                const opAttributes = extractAttributes(opContent);
-                                opAttributes.idCli = currentCliId;
-                                opData.push(opAttributes);
-                            } else if (inOpBlock && trimmed.startsWith('<Gar')) {
-                                const garAttributes = extractAttributes(trimmed);
-                                garAttributes.idCli = currentCliId;
-                                garAttributes.idOp = currentOpId;
-                                garData.push(garAttributes);
-                            }
-                        }
-                    } else {
-                        outputLines.push(line);
-                    }
+                    processLine(line, outputType, {
+                        cliData, opData, garData, outputLines,
+                        inCliBlock, inOpBlock, buffer, currentCliId, currentOpId
+                    });
                 }
-                
+
                 const progress = Math.round((bytesProcessed / totalBytes) * 100);
                 updateProgress(progress);
                 addLog(`Progresso: ${progress}% (${bytesProcessed}/${totalBytes} bytes)`, 'info', true);
             }
             
             // Processa o buffer final
-            if (inCliBlock && buffer.length > 0) {
+            if (buffer.length > 0) {
                 if (outputType === 'xml') {
                     outputLines.push(buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
                 } else if (outputType === 'excel') {
@@ -333,10 +275,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     const cliAttributes = extractAttributes(cliContent);
                     cliAttributes.id = currentCliId;
                     cliData.push(cliAttributes);
+                    buffer = [];
                 }
-            } else if (contentBuffer.length > 0) {
-                 outputLines.push(contentBuffer);
             }
+            if (contentBuffer.length > 0) {
+                if (outputType === 'xml') {
+                    outputLines.push(contentBuffer);
+                }
+            }
+            
 
             if (outputType === 'excel') {
                 createExcelExport(cliData, opData, garData, AppState.selectedFile.name);
@@ -360,6 +307,66 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Função auxiliar para processar cada linha
+    function processLine(line, outputType, state) {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        if (trimmed.startsWith('<Cli')) {
+            if (state.inCliBlock && outputType === 'xml') {
+                state.outputLines.push(state.buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
+            }
+            state.inCliBlock = true;
+            state.inOpBlock = false;
+            state.currentCliId++;
+            state.currentOpId = 0;
+            state.buffer = [trimmed];
+            return;
+        }
+
+        if (state.inCliBlock) {
+            if (trimmed.endsWith('</Cli>')) {
+                state.inCliBlock = false;
+                state.buffer.push(trimmed);
+
+                if (outputType === 'excel') {
+                    const fullContent = state.buffer.join('');
+                    const cliAttributes = extractAttributes(fullContent.match(/<Cli[^>]*>/)[0]);
+                    cliAttributes.id = state.currentCliId;
+                    state.cliData.push(cliAttributes);
+
+                    const opRegex = /<Op[^>]*>[\s\S]*?<\/Op>/g;
+                    const opMatches = fullContent.match(opRegex) || [];
+                    opMatches.forEach((opMatch) => {
+                        const opAttributes = extractAttributes(opMatch.match(/<Op[^>]*>/)[0]);
+                        state.currentOpId++;
+                        opAttributes.idCli = cliAttributes.id;
+                        opAttributes.idOp = state.currentOpId;
+                        state.opData.push(opAttributes);
+
+                        const garRegex = /<Gar[^>]*\/>/g;
+                        const garMatches = opMatch.match(garRegex) || [];
+                        garMatches.forEach(garMatch => {
+                            const garAttributes = extractAttributes(garMatch);
+                            garAttributes.idCli = cliAttributes.id;
+                            garAttributes.idOp = opAttributes.idOp;
+                            state.garData.push(garAttributes);
+                        });
+                    });
+                } else if (outputType === 'xml') {
+                    state.outputLines.push(state.buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
+                }
+                state.buffer = [];
+                return;
+            }
+
+            state.buffer.push(trimmed);
+        } else {
+            state.outputLines.push(line);
+        }
+    }
+    
+    // Funções de download e manipulação de arquivos (inalteradas)
     function createExcelExport(cliData, opData, garData, originalFilename) {
         try {
             addLog('Criando arquivo Excel...', 'info');
