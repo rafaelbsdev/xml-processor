@@ -232,16 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             while (true) {
                 const { done, value } = await reader.read();
-                if (done) {
-                    // Processa o buffer final
-                    if (contentBuffer.length > 0) {
-                         processFinalBuffer(contentBuffer, outputType, { cliData, opData, garData, outputLines, inCliBlock, buffer });
-                    }
-                    if (buffer.length > 0) {
-                         processFinalBuffer(buffer.join('\n'), outputType, { cliData, opData, garData, outputLines, inCliBlock, buffer });
-                    }
-                    break;
-                }
+                if (done) break;
                 
                 bytesProcessed += value.length;
                 contentBuffer += decoder.decode(value, { stream: true });
@@ -250,15 +241,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 contentBuffer = lines.pop();
 
                 for (const line of lines) {
-                     // Lógica de processamento isolada para cada linha
-                     processLineByLine(line, outputType, { cliData, opData, garData, outputLines, inCliBlock, buffer });
-                }
+                    const trimmed = line.trim();
+                    if (!trimmed) continue;
 
+                    if (trimmed.startsWith('<Cli')) {
+                        if (inCliBlock) {
+                            if (outputType === 'xml') {
+                                outputLines.push(buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
+                            } else if (outputType === 'excel') {
+                                processExcelBlock(buffer.join(''), cliData, opData, garData);
+                            }
+                        }
+                        inCliBlock = true;
+                        buffer = [trimmed];
+                    } else if (inCliBlock) {
+                        buffer.push(trimmed);
+                        if (trimmed.endsWith('</Cli>')) {
+                            if (outputType === 'xml') {
+                                outputLines.push(buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
+                            } else if (outputType === 'excel') {
+                                processExcelBlock(buffer.join(''), cliData, opData, garData);
+                            }
+                            inCliBlock = false;
+                            buffer = [];
+                        }
+                    } else {
+                        outputLines.push(line);
+                    }
+                }
                 const progress = Math.round((bytesProcessed / totalBytes) * 100);
                 updateProgress(progress);
                 addLog(`Progresso: ${progress}% (${bytesProcessed}/${totalBytes} bytes)`, 'info', true);
             }
-            
+
+            // Processa o buffer final
+            if (inCliBlock && buffer.length > 0) {
+                 if (outputType === 'xml') {
+                     outputLines.push(buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
+                 } else if (outputType === 'excel') {
+                     processExcelBlock(buffer.join(''), cliData, opData, garData);
+                 }
+            }
+            if (contentBuffer.length > 0 && !inCliBlock) {
+                 outputLines.push(contentBuffer);
+            }
+
             if (outputType === 'excel') {
                 createExcelExport(cliData, opData, garData, AppState.selectedFile.name);
                 addLog(`Clientes (Cli) processados: ${cliData.length}`, 'info');
@@ -280,58 +307,6 @@ document.addEventListener('DOMContentLoaded', () => {
             AppState.isProcessing = false;
         }
     }
-
-    // Função para processar linhas, separando a lógica de cada tipo de saída
-    function processLineByLine(line, outputType, state) {
-        const trimmed = line.trim();
-        if (!trimmed) return;
-
-        if (trimmed.startsWith('<Cli')) {
-            if (state.inCliBlock) {
-                 if (outputType === 'xml') {
-                     state.outputLines.push(state.buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
-                 } else if (outputType === 'excel') {
-                     processExcelBlock(state.buffer.join(''), state.cliData, state.opData, state.garData);
-                 }
-            }
-            state.inCliBlock = true;
-            state.buffer = [trimmed];
-            return;
-        }
-        
-        if (state.inCliBlock) {
-            state.buffer.push(trimmed);
-            
-            if (trimmed.endsWith('</Cli>')) {
-                state.inCliBlock = false;
-                if (outputType === 'excel') {
-                    processExcelBlock(state.buffer.join(''), state.cliData, state.opData, state.garData);
-                } else if (outputType === 'xml') {
-                    state.outputLines.push(state.buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
-                }
-                state.buffer = [];
-                return;
-            }
-        } else {
-            // Linhas fora de um bloco Cli (ex: tags de cabeçalho)
-            state.outputLines.push(line);
-        }
-    }
-    
-    // Funções para processar o buffer final (fim do arquivo)
-    function processFinalBuffer(content, outputType, state) {
-         if (outputType === 'xml') {
-             if (state.inCliBlock && state.buffer.length > 0) {
-                 state.outputLines.push(state.buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
-             } else if (content.length > 0) {
-                 state.outputLines.push(content);
-             }
-         } else if (outputType === 'excel') {
-             if (state.inCliBlock && state.buffer.length > 0) {
-                 processExcelBlock(state.buffer.join(''), state.cliData, state.opData, state.garData);
-             }
-         }
-    }
     
     // Lógica para processar um bloco de XML e extrair dados para o Excel
     function processExcelBlock(xmlBlockContent, cliData, opData, garData) {
@@ -344,11 +319,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const opRegex = /<Op[^>]*>[\s\S]*?<\/Op>/g;
             const opMatches = xmlBlockContent.match(opRegex) || [];
             opMatches.forEach((opMatch) => {
-                const opAttributes = extractAttributes(opMatch.match(/<Op[^>]*>/)[0]);
+                const opMatchTag = opMatch.match(/<Op[^>]*>/);
+                const opAttributes = opMatchTag ? extractAttributes(opMatchTag[0]) : {};
                 opAttributes.Cd = cliCd;
                 opData.push(opAttributes);
 
-                // Expressão regular para encontrar as tags <Venc> e <ContInstFinRes4966>
                 const subTagRegex = /<(Venc|ContInstFinRes4966)[^>]*\/>/g;
                 let subTagMatch;
                 while ((subTagMatch = subTagRegex.exec(opMatch)) !== null) {
