@@ -25,13 +25,13 @@
                     <p class="secondary-message">ou</p>
                     <button id="selectFileBtn">Selecionar Arquivo</button>
                 </div>
-                <div class="file-info" id="fileInfo">
+                <div class="file-info" id="fileInfo" style="display: none;">
                     <i class="fas fa-file-alt file-icon"></i>
                     <div class="file-details">
                         <span class="file-name" id="fileName">Nenhum arquivo selecionado</span>
                         <span class="file-size" id="fileSize"></span>
                     </div>
-                    <button class="clear-file" id="clearFileBtn" title="Remover arquivo">
+                    <button class="clear-file" id="clearFileBtn" title="Remover arquivo" disabled>
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
@@ -39,7 +39,7 @@
             
             <div class="actions">
                 <button id="processExcelBtn" disabled>
-                    <i class="fas fa-file-excel"></i> Gerar Excel
+                    <i class="fas fa-file-archive"></i> Gerar ZIP com 3 XMLs
                 </button>
                 <button id="processXmlBtn" disabled>
                     <i class="fas fa-code"></i> Gerar XML Simplificado
@@ -77,6 +77,6 @@
     </div>
 
     <script src="app.js"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </body>
 </html>
