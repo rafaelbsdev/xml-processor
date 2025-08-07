@@ -192,10 +192,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let clientesXml = '';
         let operacoesXml = '';
         let garantiasXml = '';
-        let simplifiedXml = '<?xml version="1.0" encoding="utf-8"?>\n<root>\n'; // Adicionado o cabeçalho XML e tag raiz
+        let simplifiedXml = '';
 
         let currentCliCd = '';
         let currentOpNum = '';
+        let inCmpBlock = false;
 
         try {
             while (true) {
@@ -230,7 +231,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             currentCliCd = '';
                         }
                     } else if (outputType === 'xml_simplificado') {
-                        if (!trimmed.startsWith('<Cmp') && !trimmed.startsWith('</Cmp>')) {
+                        if (trimmed.startsWith('<Cmp')) {
+                            inCmpBlock = true;
+                        } else if (trimmed.startsWith('</Cmp>')) {
+                            inCmpBlock = false;
+                            continue;
+                        }
+
+                        if (!inCmpBlock) {
                             simplifiedXml += `${line}\n`;
                         }
                     }
@@ -254,7 +262,13 @@ document.addEventListener('DOMContentLoaded', () => {
                      }
                  } else if (outputType === 'xml_simplificado') {
                      const trimmed = contentBuffer.trim();
-                     if (!trimmed.startsWith('<Cmp') && !trimmed.startsWith('</Cmp>')) {
+                     if (trimmed.startsWith('<Cmp')) {
+                         inCmpBlock = true;
+                     } else if (trimmed.startsWith('</Cmp>')) {
+                         inCmpBlock = false;
+                     }
+
+                     if (!inCmpBlock) {
                          simplifiedXml += `${contentBuffer}\n`;
                      }
                  }
@@ -267,8 +281,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     garantias: garantiasXml
                 }, file.name);
             } else if (outputType === 'xml_simplificado') {
-                simplifiedXml += '</root>'; // Fecha a tag raiz
-                downloadFile(simplifiedXml, file.name, 'xml');
+                // Adiciona o cabeçalho e tag raiz somente aqui, após a filtragem
+                const finalSimplifiedXml = `<?xml version="1.0" encoding="utf-8"?>\n<root>\n${simplifiedXml.trim()}\n</root>`;
+                downloadFile(finalSimplifiedXml, file.name, 'xml');
             }
 
             addLog(`Processamento para ${outputType} concluído!`, 'success');
@@ -309,7 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-        }, 100);
+        }, 50);
         addLog(`Arquivo "${newFilename}" gerado com sucesso!`, 'success');
     }
 
