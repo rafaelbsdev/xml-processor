@@ -8,7 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
         fileInput: document.getElementById('fileInput'),
         dropZone: document.getElementById('dropZone'),
         selectFileBtn: document.getElementById('selectFileBtn'),
-        processExcelBtn: document.getElementById('processExcelBtn'),
+        processExcelBtn: document.getElementById('processExcelBtn'), // Mantido para compatibilidade, mas agora desabilitado
+        processCsvBtn: document.getElementById('processCsvBtn'), // Novo botão
         processXmlBtn: document.getElementById('processXmlBtn'),
         downloadSampleBtn: document.getElementById('downloadSampleBtn'),
         clearFileBtn: document.getElementById('clearFileBtn'),
@@ -44,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
             UI.fileInput.click();
         });
         UI.fileInput.addEventListener('change', handleFileSelection);
-        UI.processExcelBtn.addEventListener('click', () => processFile('excel'));
+        UI.processCsvBtn.addEventListener('click', () => processFile('csv'));
         UI.processXmlBtn.addEventListener('click', () => processFile('xml'));
         UI.clearFileBtn.addEventListener('click', clearFileSelection);
         UI.downloadSampleBtn.addEventListener('click', downloadSampleFile);
@@ -88,6 +89,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return attributes;
     }
+    
+    function sanitizeForCsv(value) {
+        if (value === null || value === undefined) {
+            return '';
+        }
+        // Remove quebras de linha e escapa aspas
+        const sanitized = String(value).replace(/"/g, '""').replace(/\r?\n|\r/g, ' ');
+        // Adiciona aspas se o valor contiver vírgula
+        return sanitized.includes(',') ? `"${sanitized}"` : sanitized;
+    }
 
     // Manipulação de arquivos
     function handleFileSelection(e) {
@@ -114,8 +125,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateFileDisplay(file);
         addLog(`Arquivo selecionado: ${file.name}`, 'success');
         addLog(`Tamanho: ${formatFileSize(file.size)}`, 'info');
-        UI.processExcelBtn.disabled = false;
+        UI.processCsvBtn.disabled = false;
         UI.processXmlBtn.disabled = false;
+        UI.processExcelBtn.disabled = true; // Desabilitado para evitar erro de memória
     }
 
     function clearFileSelection() {
@@ -123,8 +135,9 @@ document.addEventListener('DOMContentLoaded', () => {
         AppState.selectedFile = null;
         resetFileDisplay();
         addLog('Seleção de arquivo removida.', 'info');
-        UI.processExcelBtn.disabled = true;
+        UI.processCsvBtn.disabled = true;
         UI.processXmlBtn.disabled = true;
+        UI.processExcelBtn.disabled = true;
     }
 
     // Atualização da UI
@@ -203,11 +216,11 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.logContent.innerHTML = '<div class="log-entry">Log limpo.</div>';
     }
 
-    // Lógica de processamento isolada para XML e Excel
+    // Lógica de processamento para CSV
     async function processFile(outputType) {
         if (!AppState.selectedFile || AppState.isProcessing) return;
         AppState.isProcessing = true;
-        UI.processExcelBtn.disabled = true;
+        UI.processCsvBtn.disabled = true;
         UI.processXmlBtn.disabled = true;
         UI.dropZone.classList.add('processing');
         addLog(`Iniciando processamento para ${outputType}...`, 'info');
@@ -221,18 +234,13 @@ document.addEventListener('DOMContentLoaded', () => {
         let bytesProcessed = 0;
         const totalBytes = file.size;
         
-        // Arrays para o Excel
-        const cliData = [];
-        const opData = [];
-        const garData = [];
-
-        const outputLines = [];
+        let outputContent = '';
+        const csvHeader = 'cli_Cd,cli_Nom,op_Num,op_Vlr,gar_Cd,gar_Vlr\n';
+        outputContent += csvHeader;
 
         let inCliBlock = false;
         let buffer = [];
         
-        let cliCount = 0; // Contador para limitar a 10 clientes
-
         try {
             while (true) {
                 const { done, value } = await reader.read();
@@ -250,11 +258,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (trimmed.startsWith('<Cli')) {
                         if (inCliBlock) {
-                            if (outputType === 'xml') {
-                                outputLines.push(buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
-                            } else if (outputType === 'excel') {
-                                processExcelBlock(buffer.join(''), cliData, opData, garData);
-                                cliCount++;
+                            if (outputType === 'csv') {
+                                outputContent += processCsvBlock(buffer.join(''));
                             }
                         }
                         inCliBlock = true;
@@ -262,23 +267,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else if (inCliBlock) {
                         buffer.push(trimmed);
                         if (trimmed.endsWith('</Cli>')) {
-                            if (outputType === 'xml') {
-                                outputLines.push(buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
-                            } else if (outputType === 'excel') {
-                                processExcelBlock(buffer.join(''), cliData, opData, garData);
-                                cliCount++;
+                            if (outputType === 'csv') {
+                                outputContent += processCsvBlock(buffer.join(''));
                             }
                             inCliBlock = false;
                             buffer = [];
-                            
-                            // Parar o processamento após 10 clientes se a saída for Excel
-                            if (outputType === 'excel' && cliCount >= 10) {
-                                addLog('Processamento limitado aos 10 primeiros clientes para o Excel.', 'info');
-                                throw new Error('Limit reached');
-                            }
                         }
-                    } else {
-                        outputLines.push(line);
+                    } else if (outputType !== 'csv') {
+                        outputContent += line + '\n';
                     }
                 }
                 const progress = Math.round((bytesProcessed / totalBytes) * 100);
@@ -288,90 +284,100 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Processa o buffer final
             if (inCliBlock && buffer.length > 0) {
-                 if (outputType === 'xml') {
-                     outputLines.push(buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
-                 } else if (outputType === 'excel') {
-                     processExcelBlock(buffer.join(''), cliData, opData, garData);
-                     cliCount++;
+                 if (outputType === 'csv') {
+                     outputContent += processCsvBlock(buffer.join(''));
                  }
             }
-            if (contentBuffer.length > 0 && !inCliBlock) {
-                 outputLines.push(contentBuffer);
+            if (contentBuffer.length > 0 && outputType !== 'csv') {
+                 outputContent += contentBuffer + '\n';
             }
 
-            if (outputType === 'excel') {
-                createExcelExport(cliData, opData, garData, AppState.selectedFile.name);
-                addLog(`Clientes (Cli) processados: ${cliData.length}`, 'info');
-                addLog(`Operações (Op) processadas: ${opData.length}`, 'info');
-                addLog(`Garantias (Gar) processadas: ${garData.length}`, 'info');
-            } else if (outputType === 'xml') {
-                createDownload(outputLines.join('\n'), AppState.selectedFile.name);
+            if (outputType === 'csv') {
+                createCsvExport(outputContent, AppState.selectedFile.name);
+            } else {
+                createDownload(outputContent, AppState.selectedFile.name);
             }
 
             addLog(`Processamento para ${outputType} concluído!`, 'success');
             updateProgress(100);
 
         } catch (error) {
-            if (error.message === 'Limit reached') {
-                addLog('Limite de 10 clientes atingido. Gerando o Excel com os dados processados.', 'success');
-                createExcelExport(cliData, opData, garData, AppState.selectedFile.name);
-                addLog(`Clientes (Cli) processados: ${cliData.length}`, 'info');
-                addLog(`Operações (Op) processadas: ${opData.length}`, 'info');
-                addLog(`Garantias (Gar) processadas: ${garData.length}`, 'info');
-                updateProgress(100);
-            } else {
-                handleProcessingError(error);
-            }
+            handleProcessingError(error);
         } finally {
             UI.dropZone.classList.remove('processing');
-            UI.processExcelBtn.disabled = false;
+            UI.processCsvBtn.disabled = false;
             UI.processXmlBtn.disabled = false;
             AppState.isProcessing = false;
         }
     }
     
-    // Lógica para processar um bloco de XML e extrair dados para o Excel
-    function processExcelBlock(xmlBlockContent, cliData, opData, garData) {
+    function processCsvBlock(xmlBlockContent) {
+        let csvLines = '';
+
         const cliMatch = xmlBlockContent.match(/<Cli[^>]*>/);
         if (cliMatch) {
             const cliAttributes = extractAttributes(cliMatch[0]);
-            cliData.push(cliAttributes);
-            const cliCd = cliAttributes.Cd;
+            const cliCd = cliAttributes.Cd || '';
+            const cliNom = cliAttributes.Nom || '';
 
             const opRegex = /<Op[^>]*>[\s\S]*?<\/Op>/g;
             const opMatches = xmlBlockContent.match(opRegex) || [];
             
-            opMatches.forEach((opMatch) => {
-                const opMatchTag = opMatch.match(/<Op[^>]*>/);
-                const opAttributes = opMatchTag ? extractAttributes(opMatchTag[0]) : {};
-                opAttributes.Cd = cliCd;
-                opData.push(opAttributes);
-                
-                const subTagRegex = /<(Venc|ContInstFinRes4966)[^>]*\/>/g;
-                let subTagMatch;
-                while ((subTagMatch = subTagRegex.exec(opMatch)) !== null) {
-                    const garAttributes = extractAttributes(subTagMatch[0]);
-                    garAttributes.Cd = cliCd;
-                    garData.push(garAttributes);
-                }
-            });
+            if (opMatches.length === 0) {
+                // Caso não haja Op, cria uma linha apenas com dados do Cli
+                csvLines += [
+                    sanitizeForCsv(cliCd),
+                    sanitizeForCsv(cliNom),
+                    '', '', '', ''
+                ].join(',') + '\n';
+            } else {
+                opMatches.forEach((opMatch) => {
+                    const opMatchTag = opMatch.match(/<Op[^>]*>/);
+                    const opAttributes = opMatchTag ? extractAttributes(opMatchTag[0]) : {};
+                    const opNum = opAttributes.Num || '';
+                    const opVlr = opAttributes.Vlr || '';
+                    
+                    const garRegex = /<(Venc|ContInstFinRes4966)[^>]*\/>/g;
+                    const garMatches = opMatch.match(garRegex) || [];
+
+                    if (garMatches.length === 0) {
+                        // Caso não haja Gar, cria uma linha com Cli e Op
+                        csvLines += [
+                            sanitizeForCsv(cliCd),
+                            sanitizeForCsv(cliNom),
+                            sanitizeForCsv(opNum),
+                            sanitizeForCsv(opVlr),
+                            '', ''
+                        ].join(',') + '\n';
+                    } else {
+                         garMatches.forEach((garMatch) => {
+                            const garAttributes = extractAttributes(garMatch);
+                            const garCd = garAttributes.Cd || '';
+                            const garVlr = garAttributes.Vlr || '';
+
+                            // Cria uma linha completa para cada garantia
+                            csvLines += [
+                                sanitizeForCsv(cliCd),
+                                sanitizeForCsv(cliNom),
+                                sanitizeForCsv(opNum),
+                                sanitizeForCsv(opVlr),
+                                sanitizeForCsv(garCd),
+                                sanitizeForCsv(garVlr)
+                            ].join(',') + '\n';
+                        });
+                    }
+                });
+            }
         }
+        return csvLines;
     }
 
     // Funções de download e manipulação de arquivos
-    function createExcelExport(cliData, opData, garData, originalFilename) {
+    function createCsvExport(content, originalFilename) {
         try {
-            addLog('Criando arquivo Excel...', 'info');
-            const workbook = XLSX.utils.book_new();
-            const cliSheet = XLSX.utils.json_to_sheet(cliData);
-            const opSheet = XLSX.utils.json_to_sheet(opData);
-            const garSheet = XLSX.utils.json_to_sheet(garData);
-            XLSX.utils.book_append_sheet(workbook, cliSheet, 'Clientes');
-            XLSX.utils.book_append_sheet(workbook, opSheet, 'Operacoes');
-            XLSX.utils.book_append_sheet(workbook, garSheet, 'Garantias');
-            const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-            const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-            const newFilename = originalFilename.replace(/(\.\w+)$/, '_ALTERADO.xlsx');
+            addLog('Criando arquivo CSV...', 'info');
+            const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+            const newFilename = originalFilename.replace(/(\.\w+)$/, '_ALTERADO.csv');
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -382,17 +388,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             }, 100);
-            addLog(`Arquivo Excel "${newFilename}" gerado com sucesso!`, 'success');
+            addLog(`Arquivo CSV "${newFilename}" gerado com sucesso!`, 'success');
         } catch (error) {
-            addLog(`Erro ao criar Excel: ${error.message}`, 'error');
+            addLog(`Erro ao criar CSV: ${error.message}`, 'error');
         } finally {
             UI.dropZone.classList.remove('processing');
-            UI.processExcelBtn.disabled = false;
+            UI.processCsvBtn.disabled = false;
             UI.processXmlBtn.disabled = false;
             AppState.isProcessing = false;
         }
     }
-    
+
     function createDownload(content, originalFilename) {
         try {
             addLog('Preparando arquivo para download...', 'info');
@@ -411,7 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
             addLog(`Erro ao criar download: ${error.message}`, 'error');
         } finally {
             UI.dropZone.classList.remove('processing');
-            UI.processExcelBtn.disabled = false;
+            UI.processCsvBtn.disabled = false;
             UI.processXmlBtn.disabled = false;
             AppState.isProcessing = false;
         }
@@ -421,7 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addLog(`Erro durante o processamento: ${error.message}`, 'error');
         updateProgress(0);
         UI.dropZone.classList.remove('processing');
-        UI.processExcelBtn.disabled = false;
+        UI.processCsvBtn.disabled = false;
         UI.processXmlBtn.disabled = false;
         AppState.isProcessing = false;
     }
