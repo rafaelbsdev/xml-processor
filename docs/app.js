@@ -44,7 +44,6 @@ document.addEventListener('DOMContentLoaded', () => {
             UI.fileInput.click();
         });
 
-        UI.dropZone.addEventListener('click', () => UI.fileInput.click());
         UI.fileInput.addEventListener('change', handleFileSelection);
 
         UI.processExcelBtn.addEventListener('click', () => processFile('excel'));
@@ -57,12 +56,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const dragEvents = ['dragenter', 'dragover', 'dragleave', 'drop'];
         dragEvents.forEach(eventName => {
             UI.dropZone.addEventListener(eventName, preventDefaults, false);
-            document.body.addEventListener(eventName, preventDefaults, false);
         });
 
-        ['dragenter', 'dragover'].forEach(eventName => {
-            UI.dropZone.addEventListener(eventName, highlightDropZone, false);
-        });
+        UI.dropZone.addEventListener('dragenter', highlightDropZone, false);
+        UI.dropZone.addEventListener('dragover', highlightDropZone, false);
 
         ['dragleave', 'drop'].forEach(eventName => {
             UI.dropZone.addEventListener(eventName, unhighlightDropZone, false);
@@ -125,6 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addLog(`Arquivo selecionado: ${file.name}`, 'success');
         addLog(`Tamanho: ${formatFileSize(file.size)}`, 'info');
         
+        // Ativa os botões de processamento
         UI.processExcelBtn.disabled = false;
         UI.processXmlBtn.disabled = false;
     }
@@ -135,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resetFileDisplay();
         addLog('Seleção de arquivo removida.', 'info');
         
+        // Desativa os botões de processamento
         UI.processExcelBtn.disabled = true;
         UI.processXmlBtn.disabled = true;
     }
@@ -238,7 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const decoder = new TextDecoder(ENCODING);
         let contentBuffer = '';
         let linesProcessed = 0;
-        const totalLines = file.size; // Use o tamanho do arquivo como base para o progresso
+        const totalLines = file.size;
         
         const cliData = [];
         const opData = [];
@@ -260,11 +259,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 contentBuffer += decoder.decode(value, { stream: true });
                 const lines = contentBuffer.split(/\r?\n/);
 
-                contentBuffer = lines.pop(); // Armazena a última linha incompleta
+                contentBuffer = lines.pop();
 
                 for (const line of lines) {
                     const trimmed = line.trim();
-                    linesProcessed += line.length + 1; // +1 para o caractere de quebra de linha
+                    linesProcessed += line.length + 1;
                     
                     const progress = Math.round((linesProcessed / totalLines) * 100);
                     updateProgress(progress);
@@ -273,7 +272,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!trimmed) continue;
                     
                     if (outputType === 'excel') {
-                        // Lógica de processamento para Excel
                         if (trimmed.startsWith('<Cli') || trimmed.includes('<Cli')) {
                             inCliBlock = true;
                             currentCliId++;
@@ -324,7 +322,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
 
                     } else if (outputType === 'xml') {
-                        // Lógica de processamento para XML simplificado
                         if (trimmed.startsWith('<Cli') || trimmed.includes('<Cli')) {
                             inCliBlock = true;
                         }
@@ -336,7 +333,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                 inCliBlock = false;
                                 outputLines.push(buffer.join(''));
                                 buffer = [];
-                                
                             }
                         } else {
                             outputLines.push(trimmed);
@@ -345,10 +341,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // Processar a última linha no buffer, se houver
             if (contentBuffer.length > 0) {
                 if (outputType === 'excel') {
-                    // Finalizar o último bloco, se existir
                     if (inOpBlock) {
                         buffer.push(contentBuffer.trim());
                         const opContent = buffer.join('');
@@ -372,7 +366,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             
-            // Chamar a função de download
             if (outputType === 'excel') {
                 createExcelExport(cliData, opData, garData, AppState.selectedFile.name);
             } else if (outputType === 'xml') {
@@ -392,7 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Função para criar o arquivo Excel (inalterada)
+    // Função para criar o arquivo Excel
     function createExcelExport(cliData, opData, garData, originalFilename) {
         try {
             addLog('Criando arquivo Excel...', 'info');
@@ -432,7 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Função para criar o download do XML (inalterada)
+    // Função para criar o download do XML
     function createDownload(content, originalFilename) {
         try {
             addLog('Preparando arquivo para download...', 'info');
@@ -471,7 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
         AppState.isProcessing = false;
     }
 
-    // Exemplo de arquivo (inalterada)
+    // Exemplo de arquivo
     function downloadSampleFile() {
         const sampleContent = `É o Rafa vida.... Ta achando q vai ser mamão assim? Sobe o XML vc ai pô. Quer tudo mamão? Quer docinho? Ai não dá né?`;
         
