@@ -200,6 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Variáveis para a nova lógica de extração de blocos Cli
         let inCliBlock = false;
         let cliBlockBuffer = '';
+        let isFirstCli = true;
 
         try {
             while (true) {
@@ -237,10 +238,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Nova lógica para extrair blocos <Cli>
                         if (trimmed.startsWith('<Cli')) {
                             inCliBlock = true;
+                            // Se não for o primeiro, adiciona uma nova linha antes
+                            if (!isFirstCli) {
+                                simplifiedXml += '\n';
+                            }
+                            isFirstCli = false;
                             cliBlockBuffer = line;
                         } else if (trimmed.includes('</Cli>')) {
                             cliBlockBuffer += `\n${line}`;
-                            simplifiedXml += cliBlockBuffer + '\n';
+                            simplifiedXml += cliBlockBuffer;
                             inCliBlock = false;
                             cliBlockBuffer = '';
                         } else if (inCliBlock) {
@@ -253,9 +259,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 addLog(`Progresso: ${progress}% (${bytesProcessed}/${totalBytes} bytes)`, 'info', true);
             }
 
-            // Lidar com o buffer restante
+            // Lidar com o buffer restante no final do arquivo
             if (contentBuffer.length > 0) {
-                 if (outputType === 'zip') {
+                if (outputType === 'zip') {
                      const trimmed = contentBuffer.trim();
                      if (trimmed.startsWith('<Cli') || trimmed.includes('</Cli>')) {
                          clientesXml += `${trimmed}\n`;
@@ -268,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
                      }
                  } else if (outputType === 'xml_simplificado' && inCliBlock) {
                      cliBlockBuffer += `\n${contentBuffer}`;
-                     simplifiedXml += cliBlockBuffer + '\n';
+                     simplifiedXml += cliBlockBuffer;
                  }
             }
 
@@ -279,7 +285,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     garantias: garantiasXml
                 }, file.name);
             } else if (outputType === 'xml_simplificado') {
-                const finalSimplifiedXml = `<?xml version="1.0" encoding="utf-8"?>\n<root>\n${simplifiedXml.trim()}\n</root>`;
+                // Remove o primeiro <root> do arquivo e o último </root>
+                const finalSimplifiedXml = simplifiedXml.trim();
                 downloadFile(finalSimplifiedXml, file.name, 'xml');
             }
 
