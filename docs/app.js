@@ -192,15 +192,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let clientesXml = '';
         let operacoesXml = '';
         let garantiasXml = '';
-        let simplifiedXml = '';
 
         let currentCliCd = '';
         let currentOpNum = '';
-
-        // Variáveis para a nova lógica de extração de blocos Cli
-        let inCliBlock = false;
-        let cliBlockBuffer = '';
-        let isFirstCli = true;
 
         try {
             while (true) {
@@ -234,24 +228,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             clientesXml += `${trimmed}\n`;
                             currentCliCd = '';
                         }
-                    } else if (outputType === 'xml_simplificado') {
-                        // Nova lógica para extrair blocos <Cli>
-                        if (trimmed.startsWith('<Cli')) {
-                            inCliBlock = true;
-                            // Se não for o primeiro, adiciona uma nova linha antes
-                            if (!isFirstCli) {
-                                simplifiedXml += '\n';
-                            }
-                            isFirstCli = false;
-                            cliBlockBuffer = line;
-                        } else if (trimmed.includes('</Cli>')) {
-                            cliBlockBuffer += `\n${line}`;
-                            simplifiedXml += cliBlockBuffer;
-                            inCliBlock = false;
-                            cliBlockBuffer = '';
-                        } else if (inCliBlock) {
-                            cliBlockBuffer += `\n${line}`;
-                        }
                     }
                 }
                 const progress = Math.round((bytesProcessed / totalBytes) * 100);
@@ -261,7 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Lidar com o buffer restante no final do arquivo
             if (contentBuffer.length > 0) {
-                if (outputType === 'zip') {
+                 if (outputType === 'zip') {
                      const trimmed = contentBuffer.trim();
                      if (trimmed.startsWith('<Cli') || trimmed.includes('</Cli>')) {
                          clientesXml += `${trimmed}\n`;
@@ -272,9 +248,6 @@ document.addEventListener('DOMContentLoaded', () => {
                          const garWithCliOp = trimmed.replace(/\/?>/, ` CliCd="${currentCliCd}" OpNum="${currentOpNum}">`);
                          garantiasXml += `${garWithCliOp}\n`;
                      }
-                 } else if (outputType === 'xml_simplificado' && inCliBlock) {
-                     cliBlockBuffer += `\n${contentBuffer}`;
-                     simplifiedXml += cliBlockBuffer;
                  }
             }
 
@@ -285,9 +258,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     garantias: garantiasXml
                 }, file.name);
             } else if (outputType === 'xml_simplificado') {
-                // Remove o primeiro <root> do arquivo e o último </root>
-                const finalSimplifiedXml = simplifiedXml.trim();
-                downloadFile(finalSimplifiedXml, file.name, 'xml');
+                const fullText = await file.text();
+                const cliRegex = /<Cli[\s\S]*?<\/Cli>/g;
+                const simplifiedXmlContent = (fullText.match(cliRegex) || []).join('\n');
+                downloadFile(simplifiedXmlContent, file.name, 'xml');
             }
 
             addLog(`Processamento para ${outputType} concluído!`, 'success');
@@ -378,7 +352,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function downloadSampleFile() {
-        const sampleContent = `<?xml version="1.0" encoding="utf-8"?><root><Cli Cd="123" Nom="Cliente A"><Op Num="op1" Vlr="1000"><Venc v320="500"/></Op><Op Num="op2" Vlr="2000"><ContInstFinRes4966 Cd="g1" Vlr="1500"/></Op></Cli><Cli Cd="456" Nom="Cliente B"><Op Num="op3" Vlr="3000"><Venc v330="1000"/></Op></Cli></root>`;
+        const sampleContent = `<?xml version="1.0" encoding="utf-8"?>
+<Doc3040 CNPJ="04902979" DtBase="2025-06">
+  <Cli Cd="00116458658" Tp="1">
+    <Op IPOC="0490297902031001164586580000010">
+      <Venc v320="12489.12" />
+      <ContInstFinRes4966 ClasAtFin="1" />
+    </Op>
+  </Cli>
+  <Cli Cd="00444203" Tp="2">
+    <Op DetCli="00444203000177">
+      <Venc v330="124087.65" />
+      <ContInstFinRes4966 ClasAtFin="1" />
+    </Op>
+  </Cli>
+</Doc3040>`;
         try {
             const blob = new Blob([sampleContent], { type: 'text/xml' });
             const url = URL.createObjectURL(blob);
