@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Constantes de configuração
     const ALLOWED_FILE_TYPES = ['xml', 'txt'];
     const ENCODING = 'utf-8';
-    
+
     // Elementos da UI
     const UI = {
         fileInput: document.getElementById('fileInput'),
@@ -45,10 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         UI.fileInput.addEventListener('change', handleFileSelection);
-
         UI.processExcelBtn.addEventListener('click', () => processFile('excel'));
         UI.processXmlBtn.addEventListener('click', () => processFile('xml'));
-        
         UI.clearFileBtn.addEventListener('click', clearFileSelection);
         UI.downloadSampleBtn.addEventListener('click', downloadSampleFile);
         UI.clearLogBtn.addEventListener('click', clearLog);
@@ -121,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateFileDisplay(file);
         addLog(`Arquivo selecionado: ${file.name}`, 'success');
         addLog(`Tamanho: ${formatFileSize(file.size)}`, 'info');
-        
+
         UI.processExcelBtn.disabled = false;
         UI.processXmlBtn.disabled = false;
     }
@@ -131,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
         AppState.selectedFile = null;
         resetFileDisplay();
         addLog('Seleção de arquivo removida.', 'info');
-        
+
         UI.processExcelBtn.disabled = true;
         UI.processXmlBtn.disabled = true;
     }
@@ -149,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.dropZone.classList.remove('active');
         UI.mainMessage.textContent = 'Arraste e solte seu arquivo XML/TXT aqui';
         UI.secondaryMessage.style.visibility = 'visible';
-        
+
         if (!AppState.selectedFile) {
             UI.uploadIcon.className = 'fas fa-cloud-upload-alt';
             UI.uploadIcon.style.color = 'var(--secondary)';
@@ -159,11 +157,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateFileDisplay(file) {
         UI.uploadIcon.className = 'fas fa-file-alt';
         UI.uploadIcon.style.color = 'var(--warning)';
-        
+
         UI.fileName.textContent = file.name;
         UI.fileSize.textContent = formatFileSize(file.size);
         UI.fileInfo.classList.add('show');
-        
+
         UI.uploadMessage.style.display = 'none';
     }
 
@@ -178,9 +176,9 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.uploadIcon.className = 'fas fa-exclamation-circle';
         UI.uploadIcon.style.color = 'var(--error)';
         UI.dropZone.classList.add('error-state');
-        
+
         addLog(`Erro: ${message}`, 'error');
-        
+
         setTimeout(() => {
             UI.dropZone.classList.remove('error-state');
             if (!AppState.selectedFile) {
@@ -207,10 +205,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const logEntry = document.createElement('div');
         logEntry.className = `log-entry log-${type}`;
-        
+
         const timestamp = new Date().toLocaleTimeString();
         logEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
-        
+
         UI.logContent.appendChild(logEntry);
         UI.logContent.scrollTop = UI.logContent.scrollHeight;
     }
@@ -219,74 +217,89 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.logContent.innerHTML = '<div class="log-entry">Log limpo.</div>';
     }
 
-    // ** Lógica de Processamento de Arquivo Otimizada **
+    // Lógica de processamento de arquivo aprimorada e corrigida
     async function processFile(outputType) {
         if (!AppState.selectedFile || AppState.isProcessing) return;
-        
+
         AppState.isProcessing = true;
         UI.processExcelBtn.disabled = true;
         UI.processXmlBtn.disabled = true;
         UI.dropZone.classList.add('processing');
         addLog(`Iniciando processamento para ${outputType}...`, 'info');
         updateProgress(0);
-        
+
         const file = AppState.selectedFile;
         const reader = file.stream().getReader();
         const decoder = new TextDecoder(ENCODING);
-        
+
         let contentBuffer = '';
         let bytesProcessed = 0;
         const totalBytes = file.size;
-        
-        // Estruturas de dados para o processamento
+
         const cliData = [];
         const opData = [];
         const garData = [];
-        let outputLines = [];
+        const outputLines = [];
 
-        // Variáveis de controle de estado
-        let inCliBlock = false;
-        let inOpBlock = false;
-        let buffer = [];
         let currentCliId = 0;
         let currentOpId = 0;
-        
+        let inCliBlock = false;
+        let inOpBlock = false;
+        let currentBlockBuffer = [];
+
         try {
             while (true) {
                 const { done, value } = await reader.read();
-                if (done) {
-                    // Processar o buffer restante no final do arquivo
-                    if (contentBuffer.length > 0) {
-                        contentBuffer.split(/\r?\n/).forEach(line => {
-                            processLine(line, outputType, {
-                                cliData, opData, garData, outputLines,
-                                inCliBlock, inOpBlock, buffer, currentCliId, currentOpId
-                            });
-                        });
-                    }
-                    break;
-                }
+                if (done) break;
 
                 bytesProcessed += value.length;
                 contentBuffer += decoder.decode(value, { stream: true });
-                
-                // Dividir o buffer em linhas completas
+
                 let lines = contentBuffer.split(/\r?\n/);
                 contentBuffer = lines.pop(); // Armazena a última linha incompleta
-                
+
                 for (const line of lines) {
                     processLine(line, outputType, {
                         cliData, opData, garData, outputLines,
-                        inCliBlock, inOpBlock, buffer, currentCliId, currentOpId
+                        currentCliId, currentOpId,
+                        inCliBlock, inOpBlock, currentBlockBuffer
                     });
                 }
-                
+
                 const progress = Math.round((bytesProcessed / totalBytes) * 100);
                 updateProgress(progress);
                 addLog(`Progresso: ${progress}% (${bytesProcessed}/${totalBytes} bytes)`, 'info', true);
             }
-            
-            // Lógica final após o loop
+
+            // Processa o buffer final, se houver
+            if (contentBuffer.length > 0) {
+                 processLine(contentBuffer, outputType, {
+                    cliData, opData, garData, outputLines,
+                    currentCliId, currentOpId,
+                    inCliBlock, inOpBlock, currentBlockBuffer
+                });
+            }
+
+            // Garante que o último bloco seja finalizado
+            if (currentBlockBuffer.length > 0) {
+                if (outputType === 'excel') {
+                    if (inOpBlock) {
+                        const opContent = currentBlockBuffer.join('');
+                        const opAttributes = extractAttributes(opContent);
+                        opAttributes.idCli = currentCliId;
+                        opData.push(opAttributes);
+                    } else if (inCliBlock) {
+                        const cliContent = currentBlockBuffer.join('');
+                        const cliAttributes = extractAttributes(cliContent);
+                        cliAttributes.id = currentCliId;
+                        cliData.push(cliAttributes);
+                    }
+                } else if (outputType === 'xml') {
+                    outputLines.push(currentBlockBuffer.join(''));
+                }
+            }
+
+
             if (outputType === 'excel') {
                 createExcelExport(cliData, opData, garData, AppState.selectedFile.name);
                 addLog(`Clientes (Cli) processados: ${cliData.length}`, 'info');
@@ -314,55 +327,51 @@ document.addEventListener('DOMContentLoaded', () => {
         const trimmed = line.trim();
         if (!trimmed) return;
 
-        if (outputType === 'excel') {
-            if (trimmed.startsWith('<Cli')) {
-                state.inCliBlock = true;
-                state.currentCliId++;
-                state.buffer = [trimmed];
-            } else if (state.inCliBlock && trimmed.startsWith('<Op')) {
+        if (trimmed.startsWith('<Cli')) {
+            state.inCliBlock = true;
+            state.inOpBlock = false;
+            state.currentCliId++;
+            state.currentOpId = 0;
+            state.currentBlockBuffer = [];
+        }
+
+        if (state.inCliBlock) {
+            state.currentBlockBuffer.push(trimmed);
+
+            if (trimmed.startsWith('<Op')) {
                 state.inOpBlock = true;
                 state.currentOpId++;
-                state.buffer.push(trimmed);
-            } else if (state.inOpBlock && trimmed.startsWith('<Gar')) {
+            }
+
+            if (trimmed.startsWith('<Gar') && outputType === 'excel') {
                 const garAttributes = extractAttributes(trimmed);
                 garAttributes.idCli = state.currentCliId;
                 garAttributes.idOp = state.currentOpId;
                 state.garData.push(garAttributes);
-                state.buffer.push(trimmed);
-            } else if (state.inOpBlock && (trimmed.endsWith('/>') || trimmed.endsWith('</Op>'))) {
-                state.inOpBlock = false;
-                state.buffer.push(trimmed);
-                const opContent = state.buffer.join('');
+            }
+
+            if (trimmed.endsWith('</Op>') && outputType === 'excel') {
+                const opContent = state.currentBlockBuffer.slice(state.currentBlockBuffer.findIndex(l => l.includes('<Op')), state.currentBlockBuffer.length).join('');
                 const opAttributes = extractAttributes(opContent);
                 opAttributes.idCli = state.currentCliId;
-                state.opData.push(opAttributes);
-                state.buffer = [];
-            } else if (state.inCliBlock && (trimmed.endsWith('/>') || trimmed.endsWith('</Cli>'))) {
+                opData.push(opAttributes);
+            }
+
+            if (trimmed.endsWith('</Cli>')) {
                 state.inCliBlock = false;
-                state.buffer.push(trimmed);
-                const cliContent = state.buffer.join('');
-                const cliAttributes = extractAttributes(cliContent);
-                cliAttributes.id = state.currentCliId;
-                state.cliData.push(cliAttributes);
-                state.buffer = [];
-            } else if (state.inCliBlock || state.inOpBlock) {
-                state.buffer.push(trimmed);
-            }
-        } else if (outputType === 'xml') {
-            if (trimmed.startsWith('<Cli')) {
-                state.inCliBlock = true;
-            }
-            
-            if (state.inCliBlock) {
-                state.buffer.push(trimmed);
-                if (trimmed.endsWith('</Cli>')) {
-                    state.inCliBlock = false;
-                    state.outputLines.push(state.buffer.join(''));
-                    state.buffer = [];
+                if (outputType === 'excel') {
+                    const cliContent = state.currentBlockBuffer.join('');
+                    const cliAttributes = extractAttributes(cliContent);
+                    cliAttributes.id = state.currentCliId;
+                    state.cliData.push(cliAttributes);
+                } else if (outputType === 'xml') {
+                    state.outputLines.push(state.currentBlockBuffer.join(''));
                 }
-            } else {
-                state.outputLines.push(trimmed);
+                state.currentBlockBuffer = [];
             }
+        } else {
+            // Linhas fora dos blocos Cli (cabeçalho, rodapé)
+            state.outputLines.push(trimmed);
         }
     }
 
@@ -374,27 +383,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const cliSheet = XLSX.utils.json_to_sheet(cliData);
             const opSheet = XLSX.utils.json_to_sheet(opData);
             const garSheet = XLSX.utils.json_to_sheet(garData);
-            
+
             XLSX.utils.book_append_sheet(workbook, cliSheet, 'Cli');
             XLSX.utils.book_append_sheet(workbook, opSheet, 'Op');
             XLSX.utils.book_append_sheet(workbook, garSheet, 'Gar');
-            
+
             const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
             const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
             const newFilename = originalFilename.replace(/(\.\w+)$/, '_ALTERADO.xlsx');
-            
+
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = newFilename;
             document.body.appendChild(a);
             a.click();
-            
+
             setTimeout(() => {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             }, 100);
-            
+
             addLog(`Arquivo Excel "${newFilename}" gerado com sucesso!`, 'success');
         } catch (error) {
             addLog(`Erro ao criar Excel: ${error.message}`, 'error');
@@ -410,21 +419,21 @@ document.addEventListener('DOMContentLoaded', () => {
     function createDownload(content, originalFilename) {
         try {
             addLog('Preparando arquivo para download...', 'info');
-            
+
             const blob = new Blob([content], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const downloadLink = document.createElement('a');
-            
+
             const newFilename = originalFilename.replace(/(\.\w+)$/, '_ALTERADO$1');
-            
+
             downloadLink.href = url;
             downloadLink.download = newFilename;
             document.body.appendChild(downloadLink);
             downloadLink.click();
             document.body.removeChild(downloadLink);
-            
+
             setTimeout(() => URL.revokeObjectURL(url), 100);
-            
+
             addLog(`Download do arquivo "${newFilename}" iniciado`, 'success');
         } catch (error) {
             addLog(`Erro ao criar download: ${error.message}`, 'error');
@@ -448,20 +457,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // Exemplo de arquivo (inalterada)
     function downloadSampleFile() {
         const sampleContent = `É o Rafa vida.... Ta achando q vai ser mamão assim? Sobe o XML vc ai pô. Quer tudo mamão? Quer docinho? Ai não dá né?`;
-        
+
         try {
             const blob = new Blob([sampleContent], { type: 'text/xml' });
             const url = URL.createObjectURL(blob);
             const downloadLink = document.createElement('a');
-            
+
             downloadLink.href = url;
             downloadLink.download = 'exemplo_bancario.xml';
             document.body.appendChild(downloadLink);
             downloadLink.click();
             document.body.removeChild(downloadLink);
-            
+
             setTimeout(() => URL.revokeObjectURL(url), 100);
-            
+
             addLog('Exemplo XML baixado com sucesso!', 'success');
         } catch (error) {
             addLog(`Erro ao baixar exemplo: ${error.message}`, 'error');
