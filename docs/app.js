@@ -8,7 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
         fileInput: document.getElementById('fileInput'),
         dropZone: document.getElementById('dropZone'),
         selectFileBtn: document.getElementById('selectFileBtn'),
-        // O id do botão de ZIP foi corrigido no HTML
         processZipBtn: document.getElementById('processZipBtn'),
         processExcelBtn: document.getElementById('processExcelBtn'),
         processXmlBtn: document.getElementById('processXmlBtn'),
@@ -313,7 +312,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (type === 'csv') {
             newFilename = `${baseName}.csv`;
             blobType = 'text/csv;charset=utf-8;';
-            content = '\ufeff' + content;
+            // Adiciona o BOM para garantir que o Excel reconheça o UTF-8
+            // Adiciona a declaração de separador para forçar o Excel a usar o ';'
+            content = '\ufeffsep=;\n' + content;
         } else {
             newFilename = `${baseName}.txt`;
             blobType = 'text/plain';
