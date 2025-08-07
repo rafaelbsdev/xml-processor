@@ -224,34 +224,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 const simplifiedXmlContent = simplifiedBlocks.join('\n');
                 downloadFile(simplifiedXmlContent, file.name, 'xml');
             } else if (outputType === 'excel') {
-                let csvContent = '';
+                let tsvContent = '';
                 let regex;
                 const filename = file.name.toLowerCase();
 
                 if (filename.includes('_cli.xml')) {
-                    addLog('Processando arquivo _CLI.xml para CSV...', 'info');
+                    addLog('Processando arquivo _CLI.xml para TSV...', 'info');
                     const headers = ['Cd', 'Tp', 'Autorzc', 'PorteCli', 'IniRelactCli', 'FatAnual', 'TpCtrl'];
-                    csvContent += headers.join(';') + '\n';
+                    tsvContent += headers.join('\t') + '\n';
                     regex = /<Cli([^>]+)>/g;
                     let match;
                     while ((match = regex.exec(fullText)) !== null) {
                         const row = headers.map(header => extractAttribute(match[0], header));
-                        csvContent += row.join(';') + '\n';
+                        tsvContent += row.join('\t') + '\n';
                     }
                 } else if (filename.includes('_op.xml')) {
-                    addLog('Processando arquivo _OP.xml para CSV...', 'info');
+                    addLog('Processando arquivo _OP.xml para TSV...', 'info');
                     const headers = ['IPOC', 'Contrt', 'Mod', 'OrigemRec', 'Indx', 'PercIndx', 'VarCamb', 'CEP', 'TaxEft', 'DtContr', 'VlrContr', 'NatuOp', 'DtVencOp', 'ProvConsttd', 'DiaAtraso', 'CaracEspecial', 'DetCli', 'CliCd'];
-                    csvContent += headers.join(';') + '\n';
+                    tsvContent += headers.join('\t') + '\n';
                     regex = /<Op([^>]+)>/g;
                     let match;
                     while ((match = regex.exec(fullText)) !== null) {
                         const row = headers.map(header => extractAttribute(match[0], header));
-                        csvContent += row.join(';') + '\n';
+                        tsvContent += row.join('\t') + '\n';
                     }
                 } else if (filename.includes('_gar.xml')) {
-                    addLog('Processando arquivo _GAR.xml para CSV...', 'info');
+                    addLog('Processando arquivo _GAR.xml para TSV...', 'info');
                     const headers = ['CliCd', 'OpNum', 'v320', 'v330', 'ClasAtFin', 'CartProvMin', 'EstInstFin', 'VlrContBr', 'TJE'];
-                    csvContent += headers.join(';') + '\n';
+                    tsvContent += headers.join('\t') + '\n';
                     const garRegex = /<(Venc|ContInstFinRes4966)[\s\S]*?\/>/g;
                     let match;
                     while ((match = garRegex.exec(fullText)) !== null) {
@@ -265,15 +265,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                             return '';
                         });
-                        csvContent += row.join(';') + '\n';
+                        tsvContent += row.join('\t') + '\n';
                     }
                 } else {
-                    showError('Formato de arquivo XML não suportado para conversão em Excel. Nome do arquivo deve conter "_CLI", "_OP" ou "_GAR".');
+                    showError('Formato de arquivo XML não suportado para conversão em TSV. Nome do arquivo deve conter "_CLI", "_OP" ou "_GAR".');
                     return;
                 }
 
-                if (csvContent) {
-                    downloadFile(csvContent, file.name, 'csv');
+                if (tsvContent) {
+                    downloadFile(tsvContent, file.name, 'tsv');
                 }
             }
 
@@ -309,12 +309,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (type === 'xml') {
             newFilename = `${baseName}_Alterado.xml`;
             blobType = 'application/xml';
-        } else if (type === 'csv') {
-            newFilename = `${baseName}.csv`;
-            blobType = 'text/csv;charset=utf-8;';
-            // Adiciona o BOM para garantir que o Excel reconheça o UTF-8
-            // Adiciona a declaração de separador para forçar o Excel a usar o ';'
-            content = '\ufeffsep=;\n' + content;
+        } else if (type === 'tsv') {
+            newFilename = `${baseName}.tsv`;
+            blobType = 'text/tab-separated-values;charset=utf-8;';
+            content = '\ufeff' + content; // Adiciona o BOM para garantir que o Excel reconheça o UTF-8
         } else {
             newFilename = `${baseName}.txt`;
             blobType = 'text/plain';
