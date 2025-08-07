@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectFileBtn: document.getElementById('selectFileBtn'),
         processExcelBtn: document.getElementById('processExcelBtn'),
         processXmlBtn: document.getElementById('processXmlBtn'),
+        processZipBtn: document.getElementById('processZipBtn'),
         clearFileBtn: document.getElementById('clearFileBtn'),
         progressBar: document.getElementById('progressBar'),
         progressText: document.getElementById('progressText'),
@@ -37,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         UI.fileInput.addEventListener('change', handleFileSelection);
         
+        UI.processZipBtn.addEventListener('click', () => processFile('zip'));
         UI.processExcelBtn.addEventListener('click', () => processFile('excel'));
         UI.processXmlBtn.addEventListener('click', () => processFile('xml_simplificado'));
         UI.clearFileBtn.addEventListener('click', clearFileSelection);
@@ -99,13 +101,28 @@ document.addEventListener('DOMContentLoaded', () => {
             showError(`Tipo de arquivo não suportado. Use: ${ALLOWED_FILE_TYPES.join(', ')}`);
             return;
         }
+        
         AppState.selectedFile = file;
         updateFileDisplay(file);
         addLog(`Arquivo selecionado: ${file.name}`, 'success');
         addLog(`Tamanho: ${formatFileSize(file.size)}`, 'info');
-        UI.processExcelBtn.disabled = false;
-        UI.processXmlBtn.disabled = false;
+        
         UI.clearFileBtn.disabled = false;
+
+        const filename = file.name.toLowerCase();
+
+        // Desabilita todos os botões de processamento por padrão
+        UI.processZipBtn.disabled = true;
+        UI.processXmlBtn.disabled = true;
+        UI.processExcelBtn.disabled = true;
+        
+        if (filename.includes('_cli.xml') || filename.includes('_op.xml') || filename.includes('_gar.xml')) {
+            UI.processExcelBtn.disabled = false;
+        } else if (filename.includes('.xml')) {
+            // Assume que é o XML principal se não for um dos tipos específicos para Excel
+            UI.processZipBtn.disabled = false;
+            UI.processXmlBtn.disabled = false;
+        }
     }
 
     function clearFileSelection() {
@@ -113,8 +130,9 @@ document.addEventListener('DOMContentLoaded', () => {
         AppState.selectedFile = null;
         resetFileDisplay();
         addLog('Seleção de arquivo removida.', 'info');
-        UI.processExcelBtn.disabled = true;
+        UI.processZipBtn.disabled = true;
         UI.processXmlBtn.disabled = true;
+        UI.processExcelBtn.disabled = true;
         UI.clearFileBtn.disabled = true;
     }
 
@@ -173,8 +191,10 @@ document.addEventListener('DOMContentLoaded', () => {
     async function processFile(outputType) {
         if (!AppState.selectedFile || AppState.isProcessing) return;
         AppState.isProcessing = true;
-        UI.processExcelBtn.disabled = true;
+        
+        UI.processZipBtn.disabled = true;
         UI.processXmlBtn.disabled = true;
+        UI.processExcelBtn.disabled = true;
         
         addLog(`Iniciando processamento para ${outputType}...`, 'info');
         updateProgress(0);
@@ -253,9 +273,19 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             handleProcessingError(error);
         } finally {
-            UI.processExcelBtn.disabled = false;
-            UI.processXmlBtn.disabled = false;
-            AppState.isProcessing = false;
+            const filename = file.name.toLowerCase();
+            UI.clearFileBtn.disabled = false;
+
+            UI.processZipBtn.disabled = true;
+            UI.processXmlBtn.disabled = true;
+            UI.processExcelBtn.disabled = true;
+            
+            if (filename.includes('_cli.xml') || filename.includes('_op.xml') || filename.includes('_gar.xml')) {
+                UI.processExcelBtn.disabled = false;
+            } else if (filename.includes('.xml')) {
+                UI.processZipBtn.disabled = false;
+                UI.processXmlBtn.disabled = false;
+            }
         }
     }
     
@@ -325,18 +355,41 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             addLog(`Erro ao criar ZIP: ${error.message}`, 'error');
         } finally {
-            UI.processExcelBtn.disabled = false;
-            UI.processXmlBtn.disabled = false;
+            const filename = AppState.selectedFile.name.toLowerCase();
+            UI.clearFileBtn.disabled = false;
             AppState.isProcessing = false;
+            
+            UI.processZipBtn.disabled = true;
+            UI.processXmlBtn.disabled = true;
+            UI.processExcelBtn.disabled = true;
+            
+            if (filename.includes('_cli.xml') || filename.includes('_op.xml') || filename.includes('_gar.xml')) {
+                UI.processExcelBtn.disabled = false;
+            } else if (filename.includes('.xml')) {
+                UI.processZipBtn.disabled = false;
+                UI.processXmlBtn.disabled = false;
+            }
         }
     }
 
     function handleProcessingError(error) {
         addLog(`Erro durante o processamento: ${error.message}`, 'error');
         updateProgress(0);
-        UI.processExcelBtn.disabled = false;
-        UI.processXmlBtn.disabled = false;
+        
+        const filename = AppState.selectedFile.name.toLowerCase();
+        UI.clearFileBtn.disabled = false;
         AppState.isProcessing = false;
+
+        UI.processZipBtn.disabled = true;
+        UI.processXmlBtn.disabled = true;
+        UI.processExcelBtn.disabled = true;
+        
+        if (filename.includes('_cli.xml') || filename.includes('_op.xml') || filename.includes('_gar.xml')) {
+            UI.processExcelBtn.disabled = false;
+        } else if (filename.includes('.xml')) {
+            UI.processZipBtn.disabled = false;
+            UI.processXmlBtn.disabled = false;
+        }
     }
 
     init();
