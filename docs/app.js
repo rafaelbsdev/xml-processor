@@ -249,6 +249,152 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsText(AppState.selectedFile);
     }
 
+    // Função principal de processamento de conteúdo
+    function processFileContent(content) {
+        addLog('Processando conteúdo...', 'info');
+        
+        // Estruturas para armazenar os dados
+        const cliData = [];
+        const opData = [];
+        const garData = [];
+        let currentCliId = 0;
+        let currentOpId = 0;
+        
+        // Processar linhas do arquivo
+        const lines = content.split(/\r?\n/);
+        let inCliBlock = false;
+        let inOpBlock = false;
+        let buffer = [];
+        let linesProcessed = 0;
+        const totalLines = lines.length;
+        const updateInterval = Math.floor(totalLines / 100) || 1;
+        
+        for (const line of lines) {
+            const trimmed = line.trim();
+            linesProcessed++;
+            
+            // Atualizar progresso
+            if (linesProcessed % updateInterval === 0) {
+                const progress = Math.round((linesProcessed / totalLines) * 100);
+                updateProgress(progress);
+                addLog(`Processando linha ${linesProcessed} de ${totalLines} (${progress}%)`, 'info', true);
+            }
+            
+            if (!trimmed) continue;
+            
+            // Detectar blocos Cli
+            if (trimmed.startsWith('<Cli') || trimmed.includes('<Cli')) {
+                inCliBlock = true;
+                currentCliId++;
+                buffer = [trimmed];
+                continue;
+            }
+            
+            // Detectar blocos Op dentro de Cli
+            if (inCliBlock && (trimmed.startsWith('<Op') || trimmed.includes('<Op'))) {
+                inOpBlock = true;
+                currentOpId++;
+                buffer = [trimmed];
+                continue;
+            }
+            
+            // Detectar Gar dentro de Op
+            if (inOpBlock && (trimmed.startsWith('<Gar') || trimmed.includes('<Gar'))) {
+                const garAttributes = extractAttributes(trimmed);
+                garAttributes.idCli = currentCliId;
+                garAttributes.idOp = currentOpId;
+                garData.push(garAttributes);
+                continue;
+            }
+            
+            // Finalizar blocos
+            if (inOpBlock && (trimmed.endsWith('/>') || trimmed.includes('</Op>'))) {
+                inOpBlock = false;
+                buffer.push(trimmed);
+                const opContent = buffer.join('');
+                const opAttributes = extractAttributes(opContent);
+                opAttributes.idCli = currentCliId;
+                opData.push(opAttributes);
+                buffer = [];
+                continue;
+            }
+            
+            if (inCliBlock && (trimmed.endsWith('/>') || trimmed.includes('</Cli>'))) {
+                inCliBlock = false;
+                buffer.push(trimmed);
+                const cliContent = buffer.join('');
+                const cliAttributes = extractAttributes(cliContent);
+                cliAttributes.id = currentCliId;
+                cliData.push(cliAttributes);
+                buffer = [];
+                continue;
+            }
+            
+            // Adicionar ao buffer atual
+            if (inCliBlock || inOpBlock) {
+                buffer.push(trimmed);
+            }
+        }
+        
+        // Finalizar processamento
+        createExcelExport(cliData, opData, garData, AppState.selectedFile.name);
+        
+        addLog(`Processamento concluído!`, 'success');
+        addLog(`Clientes (Cli) processados: ${cliData.length}`, 'info');
+        addLog(`Operações (Op) processadas: ${opData.length}`, 'info');
+        addLog(`Garantias (Gar) processadas: ${garData.length}`, 'info');
+        updateProgress(100);
+    }
+
+    // Função para criar o arquivo Excel
+    function createExcelExport(cliData, opData, garData, originalFilename) {
+        try {
+            addLog('Criando arquivo Excel...', 'info');
+            
+            // Criar workbook
+            const workbook = XLSX.utils.book_new();
+            
+            // Converter dados para planilhas
+            const cliSheet = XLSX.utils.json_to_sheet(cliData);
+            const opSheet = XLSX.utils.json_to_sheet(opData);
+            const garSheet = XLSX.utils.json_to_sheet(garData);
+            
+            // Adicionar planilhas ao workbook
+            XLSX.utils.book_append_sheet(workbook, cliSheet, 'Cli');
+            XLSX.utils.book_append_sheet(workbook, opSheet, 'Op');
+            XLSX.utils.book_append_sheet(workbook, garSheet, 'Gar');
+            
+            // Gerar o arquivo
+            const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            
+            // Criar nome do arquivo
+            const newFilename = originalFilename.replace(/(\.\w+)$/, '_ALTERADO.xlsx');
+            
+            // Criar link de download
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = newFilename;
+            document.body.appendChild(a);
+            a.click();
+            
+            // Limpeza
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+            
+            addLog(`Arquivo Excel "${newFilename}" gerado com sucesso!`, 'success');
+        } catch (error) {
+            addLog(`Erro ao criar Excel: ${error.message}`, 'error');
+        } finally {
+            UI.dropZone.classList.remove('processing');
+            UI.processBtn.disabled = false;
+            AppState.isProcessing = false;
+        }
+    }
+
     function processFileContent(content) {
         addLog('Processando conteúdo...', 'info');
         
