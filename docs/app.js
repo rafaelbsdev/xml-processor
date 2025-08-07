@@ -221,8 +221,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let bytesProcessed = 0;
         const totalBytes = file.size;
         
-        // Novo array para o Excel único e desnormalizado
-        const excelData = [];
+        // Arrays para o Excel
+        const cliData = [];
+        const opData = [];
+        const garData = [];
+
         const outputLines = [];
 
         let inCliBlock = false;
@@ -250,7 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (outputType === 'xml') {
                                 outputLines.push(buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
                             } else if (outputType === 'excel') {
-                                processExcelBlock(buffer.join(''), excelData);
+                                processExcelBlock(buffer.join(''), cliData, opData, garData);
                                 cliCount++;
                             }
                         }
@@ -262,7 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (outputType === 'xml') {
                                 outputLines.push(buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
                             } else if (outputType === 'excel') {
-                                processExcelBlock(buffer.join(''), excelData);
+                                processExcelBlock(buffer.join(''), cliData, opData, garData);
                                 cliCount++;
                             }
                             inCliBlock = false;
@@ -288,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  if (outputType === 'xml') {
                      outputLines.push(buffer.join('').replace(/\s*[\r\n]\s*/g, ''));
                  } else if (outputType === 'excel') {
-                     processExcelBlock(buffer.join(''), excelData);
+                     processExcelBlock(buffer.join(''), cliData, opData, garData);
                      cliCount++;
                  }
             }
@@ -297,8 +300,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (outputType === 'excel') {
-                createExcelExport(excelData, AppState.selectedFile.name);
-                addLog(`Registros processados para o Excel: ${excelData.length}`, 'info');
+                createExcelExport(cliData, opData, garData, AppState.selectedFile.name);
+                addLog(`Clientes (Cli) processados: ${cliData.length}`, 'info');
+                addLog(`Operações (Op) processadas: ${opData.length}`, 'info');
+                addLog(`Garantias (Gar) processadas: ${garData.length}`, 'info');
             } else if (outputType === 'xml') {
                 createDownload(outputLines.join('\n'), AppState.selectedFile.name);
             }
@@ -309,8 +314,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             if (error.message === 'Limit reached') {
                 addLog('Limite de 10 clientes atingido. Gerando o Excel com os dados processados.', 'success');
-                createExcelExport(excelData, AppState.selectedFile.name);
-                addLog(`Registros processados para o Excel: ${excelData.length}`, 'info');
+                createExcelExport(cliData, opData, garData, AppState.selectedFile.name);
+                addLog(`Clientes (Cli) processados: ${cliData.length}`, 'info');
+                addLog(`Operações (Op) processadas: ${opData.length}`, 'info');
+                addLog(`Garantias (Gar) processadas: ${garData.length}`, 'info');
                 updateProgress(100);
             } else {
                 handleProcessingError(error);
@@ -324,53 +331,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // Lógica para processar um bloco de XML e extrair dados para o Excel
-    // Agora cria um único array desnormalizado
-    function processExcelBlock(xmlBlockContent, excelData) {
+    function processExcelBlock(xmlBlockContent, cliData, opData, garData) {
         const cliMatch = xmlBlockContent.match(/<Cli[^>]*>/);
         if (cliMatch) {
             const cliAttributes = extractAttributes(cliMatch[0]);
-            
+            cliData.push(cliAttributes);
+            const cliCd = cliAttributes.Cd;
+
             const opRegex = /<Op[^>]*>[\s\S]*?<\/Op>/g;
             const opMatches = xmlBlockContent.match(opRegex) || [];
             
             opMatches.forEach((opMatch) => {
                 const opMatchTag = opMatch.match(/<Op[^>]*>/);
                 const opAttributes = opMatchTag ? extractAttributes(opMatchTag[0]) : {};
+                opAttributes.Cd = cliCd;
+                opData.push(opAttributes);
                 
                 const subTagRegex = /<(Venc|ContInstFinRes4966)[^>]*\/>/g;
                 let subTagMatch;
-                let garProcessed = false;
                 while ((subTagMatch = subTagRegex.exec(opMatch)) !== null) {
                     const garAttributes = extractAttributes(subTagMatch[0]);
-                    
-                    const row = {
-                        ...cliAttributes,
-                        ...opAttributes,
-                        ...garAttributes
-                    };
-                    excelData.push(row);
-                    garProcessed = true;
-                }
-                
-                // Se não houver garantia, cria uma linha apenas com dados do cliente e op
-                if (!garProcessed) {
-                     const row = {
-                         ...cliAttributes,
-                         ...opAttributes,
-                     };
-                     excelData.push(row);
+                    garAttributes.Cd = cliCd;
+                    garData.push(garAttributes);
                 }
             });
         }
     }
 
-    // Funções de download e manipulação de arquivos (inalteradas)
-    function createExcelExport(data, originalFilename) {
+    // Funções de download e manipulação de arquivos
+    function createExcelExport(cliData, opData, garData, originalFilename) {
         try {
             addLog('Criando arquivo Excel...', 'info');
             const workbook = XLSX.utils.book_new();
-            const sheet = XLSX.utils.json_to_sheet(data);
-            XLSX.utils.book_append_sheet(workbook, sheet, 'Dados');
+            const cliSheet = XLSX.utils.json_to_sheet(cliData);
+            const opSheet = XLSX.utils.json_to_sheet(opData);
+            const garSheet = XLSX.utils.json_to_sheet(garData);
+            XLSX.utils.book_append_sheet(workbook, cliSheet, 'Cli');
+            XLSX.utils.book_append_sheet(workbook, opSheet, 'Op');
+            XLSX.utils.book_append_sheet(workbook, garSheet, 'Gar');
             const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
             const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
             const newFilename = originalFilename.replace(/(\.\w+)$/, '_ALTERADO.xlsx');
@@ -394,7 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
             AppState.isProcessing = false;
         }
     }
-
+    
     function createDownload(content, originalFilename) {
         try {
             addLog('Preparando arquivo para download...', 'info');
